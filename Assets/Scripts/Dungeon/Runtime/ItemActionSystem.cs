@@ -4,8 +4,12 @@ namespace Dungeon
 {
     public class ItemActionSystem : MonoBehaviour
     {
-        // Required function: do_action(item, target)
-        // Executes all ActionDefinition entries contained in the item on the given target.
+
+
+/********** ACTION EXECUTION **********/
+
+/***** execute item actions on a target *****/
+
         public void do_action(ItemDefinition item, object target)
         {
             if (item == null)
@@ -39,15 +43,19 @@ namespace Dungeon
             }
         }
 
+
+
+/********** TARGET VALIDATION **********/
+
+/***** check if an item can target an object *****/
+
         private bool IsTargetAllowed(ItemDefinition item, object target)
         {
             var kinds = item.targetKinds;
             if (kinds == 0)
                 return false;
 
-            // Self: if the caller uses the target as self, they can set targetKinds=Self.
-            // This rule is mostly for design-time clarity; at runtime we treat it as "always allowed"
-            // because we don't know the caller's identity inside do_action(target) alone.
+            // important: self target kind is always allowed here
             if (kinds.HasFlag(ItemTargetKind.Self))
                 return true;
 

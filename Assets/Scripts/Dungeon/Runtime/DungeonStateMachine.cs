@@ -23,18 +23,32 @@ namespace Dungeon
         private RoomInstance currentRoom;
         private bool initialized = false;
 
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** initialize difficulty and do first tick *****/
+
         private void Start()
         {
             difficulty = startingDifficulty;
-            state_machine(); // do initial startup step
+            state_machine(); // important: run initial startup step
         }
+
+
+/***** run state machine each frame *****/
 
         private void Update()
         {
             state_machine();
         }
 
-        // Required function: state_machine()
+
+
+/********** GAME LOOP **********/
+
+/***** main game loop and difficulty timer *****/
+
         public void state_machine()
         {
             if (hero == null || generator == null || eventSystem == null)
@@ -48,7 +62,7 @@ namespace Dungeon
                 return;
             }
 
-            // Increase difficulty over time.
+            // important: increase difficulty over time
             difficultyTimer += Time.deltaTime;
             if (difficultyTimer >= difficultyIncreaseIntervalSeconds)
             {
@@ -56,13 +70,13 @@ namespace Dungeon
                 difficulty++;
             }
 
-            // Random events can trigger from the current room candidate list.
+            // important: random events can trigger from room candidate list
             randomEventTimer += Time.deltaTime;
             if (randomEventTimer >= randomEventRollIntervalSeconds && currentRoom?.definition != null)
             {
                 randomEventTimer = 0f;
 
-                // Roll a random candidate event.
+                // important: roll a random candidate event
                 if (currentRoom.definition.candidateEvents != null && currentRoom.definition.candidateEvents.Count > 0)
                 {
                     var evt = currentRoom.definition.candidateEvents[Random.Range(0, currentRoom.definition.candidateEvents.Count)];
@@ -73,6 +87,12 @@ namespace Dungeon
                 }
             }
         }
+
+
+
+/********** ROOM TRANSITIONS **********/
+
+/***** enter room and run first-visit logic *****/
 
         private void EnterRoom(RoomInstance room)
         {
@@ -86,10 +106,10 @@ namespace Dungeon
 
             room.visited = true;
 
-            // First-time entry: spawn NPCs based on room + difficulty.
+            // important: first-time entry spawns npcs based on room and difficulty
             generator.spawn_npc(difficulty, room);
 
-            // First-time entry: execute room events.
+            // important: first-time entry executes room events
             if (room.definition?.candidateEvents != null)
             {
                 foreach (var evt in room.definition.candidateEvents)
@@ -102,7 +122,9 @@ namespace Dungeon
             }
         }
 
-        // Convenience for wiring door transitions later.
+
+/***** enter next generated room *****/
+
         public void EnterNextRoom()
         {
             var next = generator.spawn_room(currentRoom, difficulty);

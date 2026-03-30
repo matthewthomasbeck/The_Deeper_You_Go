@@ -5,8 +5,12 @@ namespace Dungeon
 {
     public class DungeonEventSystem : MonoBehaviour
     {
-        // Required function: spawn_event(event, difficulty)
-        // Prototype signature includes room/hero so the event can apply effects and spawn NPCs.
+
+
+/********** EVENT EXECUTION **********/
+
+/***** execute an event with difficulty scaling *****/
+
         public void spawn_event(EventDefinition evt, int difficulty, RoomInstance room, ActorBase hero, DungeonGenerator generator)
         {
             if (evt == null || room == null || hero == null || generator == null)
@@ -18,7 +22,7 @@ namespace Dungeon
             if (evt.oneShotPerRoomVisit && room.triggeredEventIds.Contains(evt.eventId))
                 return;
 
-            // Mark early to prevent recursion if an event spawns new rooms/cascades.
+            // important: mark early to avoid recursion on chained events
             if (evt.oneShotPerRoomVisit)
                 room.triggeredEventIds.Add(evt.eventId);
 
@@ -50,13 +54,18 @@ namespace Dungeon
             }
         }
 
+
+
+/********** DIFFICULTY SCALING **********/
+
+/***** create a scaled runtime action instance *****/
+
         private ActionDefinition ScaleAction(ActionDefinition action, EventDefinition evt, int difficulty)
         {
             if (action == null || evt == null)
                 return action;
 
-            // We avoid mutating the ScriptableObject. Instead, we create a lightweight runtime copy.
-            // (Unity won't serialize this; it's just for applying scaled effects.)
+            // important: avoid mutating scriptableobject action assets
             float mult = 1f;
             if (evt.actionAmountMultiplierByDifficulty != null)
                 mult = Mathf.Max(0f, evt.actionAmountMultiplierByDifficulty.Evaluate(difficulty));
@@ -74,6 +83,12 @@ namespace Dungeon
             runtime.name = action.name + "_runtimeScaled";
             return runtime;
         }
+
+
+
+/********** TARGET FILTERING **********/
+
+/***** check npc alignment against a target group *****/
 
         private bool NpcGroupMatches(NpcTargetGroup group, NpcAlignment alignment)
         {

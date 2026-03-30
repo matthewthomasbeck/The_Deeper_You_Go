@@ -18,11 +18,17 @@ namespace Dungeon
         public InteractableInventoryUI interactableInventoryUI;
 
         [Header("Held Item (prototype)")]
-        public ItemDefinition heldItem; // later: hotbar slot selection
+        public ItemDefinition heldItem; // important: later add hotbar slot selection
 
         private ActorBase hero;
         private Rigidbody2D rb;
         private Vector2 moveInput;
+
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** cache components and references *****/
 
         private void Awake()
         {
@@ -33,16 +39,28 @@ namespace Dungeon
                 worldCamera = Camera.main;
         }
 
+
+/***** read input for movement and clicks *****/
+
         private void Update()
         {
             ReadMoveInput();
             HandleMouseInput();
         }
 
+
+/***** apply movement velocity *****/
+
         private void FixedUpdate()
         {
             rb.linearVelocity = moveInput * moveSpeedUnitsPerSecond;
         }
+
+
+
+/********** INPUT **********/
+
+/***** read wasd movement input *****/
 
         private void ReadMoveInput()
         {
@@ -57,6 +75,9 @@ namespace Dungeon
             moveInput = new Vector2(x, y).normalized;
         }
 
+
+/***** handle left and right mouse clicks *****/
+
         private void HandleMouseInput()
         {
             if (worldCamera == null)
@@ -69,13 +90,16 @@ namespace Dungeon
                 HandleRightClick();
         }
 
+
+/***** left click applies held item effects *****/
+
         private void HandleLeftClick()
         {
             var col = GetColliderUnderMouse();
             if (col == null)
                 return;
 
-            // Left click always "attacks" with held item (if any) and applies effect to target at any distance.
+            // important: left click always applies held item effects
             var target = ResolveTarget(col);
             if (target == null)
                 return;
@@ -83,6 +107,9 @@ namespace Dungeon
             if (heldItem != null && itemActionSystem != null)
                 itemActionSystem.do_action(heldItem, target);
         }
+
+
+/***** right click opens interactables or uses held item *****/
 
         private void HandleRightClick()
         {
@@ -94,7 +121,7 @@ namespace Dungeon
             if (target == null)
                 return;
 
-            // Rule: if target is openable interactable AND hero within 2 tiles -> open inventory instead of using held item.
+            // important: right click opens interactable if within range
             if (target is InteractableBase interactable && interactable.isOpenable)
             {
                 float tileDistance = ApproxTileDistance(hero.TilePosition, interactable.TilePosition);
@@ -107,10 +134,16 @@ namespace Dungeon
                 }
             }
 
-            // Otherwise: right click uses held item effect on the clicked thing.
+            // important: otherwise right click uses held item effects
             if (heldItem != null && itemActionSystem != null)
                 itemActionSystem.do_action(heldItem, target);
         }
+
+
+
+/********** CLICK PICKING **********/
+
+/***** get collider under mouse position *****/
 
         private Collider2D GetColliderUnderMouse()
         {
@@ -118,16 +151,19 @@ namespace Dungeon
             var world = worldCamera.ScreenToWorldPoint(mouse);
             var origin = new Vector2(world.x, world.y);
 
-            // Click-pick using point overlap (works well for 2D top-down).
+            // important: click-pick uses point overlap for 2d
             return Physics2D.OverlapPoint(origin);
         }
+
+
+/***** resolve a collider into an action target *****/
 
         private object ResolveTarget(Collider2D collider)
         {
             if (collider == null)
                 return null;
 
-            // Prefer ActorBase, then InteractableBase.
+            // important: prefer ActorBase, then InteractableBase
             var actor = collider.GetComponentInParent<ActorBase>();
             if (actor != null)
                 return actor;
@@ -139,11 +175,14 @@ namespace Dungeon
             return null;
         }
 
+
+/***** estimate grid distance in tiles *****/
+
         private float ApproxTileDistance(TilePos a, TilePos b)
         {
             int dx = Mathf.Abs(a.x - b.x);
             int dy = Mathf.Abs(a.y - b.y);
-            return Mathf.Max(dx, dy); // Chebyshev distance for grid-ish proximity
+            return Mathf.Max(dx, dy); // important: uses chebyshev distance
         }
     }
 }

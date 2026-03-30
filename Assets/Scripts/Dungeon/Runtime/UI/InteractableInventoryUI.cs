@@ -12,12 +12,24 @@ namespace Dungeon
 
         private InteractableBase current;
 
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** initialize ui root and default state *****/
+
         private void Awake()
         {
             if (root == null)
                 root = gameObject;
             Hide();
         }
+
+
+
+/********** UI CONTROL **********/
+
+/***** show inventory for an interactable *****/
 
         public void Show(InteractableBase interactable)
         {
@@ -30,11 +42,17 @@ namespace Dungeon
             Refresh();
         }
 
+
+/***** hide inventory ui *****/
+
         public void Hide()
         {
             current = null;
             if (root != null) root.SetActive(false);
         }
+
+
+/***** refresh item list text *****/
 
         public void Refresh()
         {

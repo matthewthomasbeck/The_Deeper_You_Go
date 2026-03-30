@@ -57,18 +57,26 @@ namespace Dungeon
 
         public bool IsBlinded => HasStatus(StatusEffectKind.Blindness);
 
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** cache components and initialize stats *****/
+
         private void Awake()
         {
             if (inventory == null)
                 inventory = GetComponent<InventoryComponent>();
 
-            // Initialize current stats if unset.
+            // important: initialize current stats if unset
             if (health <= 0) health = maxHealth;
             if (stamina <= 0) stamina = maxStamina;
             if (magica <= 0) magica = maxMagica;
         }
 
-        // Configure an NPC spawned by the generator from a NpcDefinition.
+
+/***** configure npc from definition *****/
+
         public void ConfigureFromNpcDefinition(NpcDefinition definition)
         {
             if (definition == null)
@@ -96,6 +104,9 @@ namespace Dungeon
                 }
             }
         }
+
+
+/***** tick over-time and timed status effects *****/
 
         private void Update()
         {
@@ -133,6 +144,12 @@ namespace Dungeon
             }
         }
 
+
+
+/********** EFFECT APPLICATION **********/
+
+/***** apply action definition to this actor *****/
+
         public void ApplyStatusEffect(ActionDefinition definition)
         {
             if (definition == null)
@@ -167,6 +184,9 @@ namespace Dungeon
             }
         }
 
+
+/***** apply a signed delta to a stat *****/
+
         private void ApplyStatDelta(StatKind statKind, int delta)
         {
             if (delta == 0)
@@ -194,6 +214,9 @@ namespace Dungeon
             }
         }
 
+
+/***** add an over-time stat delta *****/
+
         private void AddOverTime(StatKind statKind, int deltaPerTick, float durationSeconds, float tickIntervalSeconds)
         {
             var s = new ActiveStatusEffect
@@ -208,12 +231,15 @@ namespace Dungeon
             activeStatuses.Add(s);
         }
 
+
+/***** add or refresh a named timed status *****/
+
         private void AddNamedStatus(StatusEffectKind kind, float durationSeconds)
         {
             if (durationSeconds <= 0f)
                 durationSeconds = 0.01f;
 
-            // Refresh duration if already present.
+            // important: refresh duration if already present
             for (int i = 0; i < activeNamedStatuses.Count; i++)
             {
                 if (activeNamedStatuses[i].kind != kind)
@@ -231,6 +257,9 @@ namespace Dungeon
             });
         }
 
+
+/***** check if a named status is active *****/
+
         private bool HasStatus(StatusEffectKind kind)
         {
             for (int i = 0; i < activeNamedStatuses.Count; i++)
@@ -241,13 +270,16 @@ namespace Dungeon
             return false;
         }
 
+
+/***** kill actor and drop inventory *****/
+
         private void Die()
         {
             isDead = true;
             if (inventory != null)
                 inventory.drop_item(this);
 
-            // Future: death animation / despawn.
+            // important: later add death animation and despawn
         }
 
         [Serializable]

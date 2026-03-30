@@ -50,6 +50,12 @@ namespace Dungeon
         }
         public int MaxMagica => maxMagica;
 
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** cache components and initialize stats *****/
+
         private void Awake()
         {
             if (inventory == null)
@@ -58,6 +64,12 @@ namespace Dungeon
             if (health <= 0)
                 health = maxHealth;
         }
+
+
+
+/********** CONFIGURATION **********/
+
+/***** configure interactable from definition *****/
 
         public void ConfigureFromInteractableDefinition(InteractableDefinition definition)
         {
@@ -80,6 +92,12 @@ namespace Dungeon
                 }
             }
         }
+
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** tick over-time and timed status effects *****/
 
         private void Update()
         {
@@ -117,6 +135,12 @@ namespace Dungeon
             }
         }
 
+
+
+/********** EFFECT APPLICATION **********/
+
+/***** apply action definition to this interactable *****/
+
         public void ApplyStatusEffect(ActionDefinition definition)
         {
             if (definition == null)
@@ -151,6 +175,12 @@ namespace Dungeon
             }
         }
 
+
+
+/********** INTERACTION **********/
+
+/***** open interactable inventory *****/
+
         public void Open()
         {
             if (isDead)
@@ -161,8 +191,14 @@ namespace Dungeon
                 return;
 
             isOpened = true;
-            // Future: UI / loot selection.
+            // important: later add inventory ui and item transfer
         }
+
+
+
+/********** STATS **********/
+
+/***** apply a signed delta to a stat *****/
 
         private void ApplyStatDelta(StatKind statKind, int delta)
         {
@@ -183,13 +219,16 @@ namespace Dungeon
                     Magica = Mathf.Clamp(Magica + delta, 0, MaxMagica);
                     break;
                 case StatKind.Experience:
-                    // Interactables don't track XP in this prototype; ignore.
+                    // important: interactables do not track experience
                     break;
                 default:
                     Debug.LogWarning($"Unhandled StatKind: {statKind}");
                     break;
             }
         }
+
+
+/***** add an over-time stat delta *****/
 
         private void AddOverTime(StatKind statKind, int deltaPerTick, float durationSeconds, float tickIntervalSeconds)
         {
@@ -204,6 +243,9 @@ namespace Dungeon
 
             activeStatuses.Add(s);
         }
+
+
+/***** add or refresh a named timed status *****/
 
         private void AddNamedStatus(StatusEffectKind kind, float durationSeconds)
         {
@@ -226,6 +268,9 @@ namespace Dungeon
                 remainingSeconds = durationSeconds,
             });
         }
+
+
+/***** kill interactable and drop inventory *****/
 
         private void Die()
         {

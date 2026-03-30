@@ -14,19 +14,24 @@ namespace Dungeon
         public GameObject fallbackNpcPrefab;
         public GameObject fallbackInteractablePrefab;
 
-        // Tracks spawned rooms by origin coordinate.
+        // important: tracks spawned rooms by origin coordinate
         private readonly Dictionary<TilePos, RoomInstance> roomMap = new Dictionary<TilePos, RoomInstance>();
 
-        // Required function: spawn_room(parent_room, difficulty)
+
+
+/********** ROOM GENERATION **********/
+
+/***** spawn a room adjacent to a parent room *****/
+
         public RoomInstance spawn_room(RoomInstance parent_room, int difficulty)
         {
             if (parent_room == null)
             {
-                // Startup / first room.
+                // important: startup spawns first room
                 return GetOrCreateRoom(new TilePos(0, 0), PickRoomTemplate(difficulty), difficulty, expandNeighborsOnce: true);
             }
 
-            // Expand from parent's doors: if parent has door(s), spawn another room for that door.
+            // important: expand from parent room doors
             foreach (var door in parent_room.definition.doorDefinitions)
             {
                 var neighborOrigin = ComputeNeighborOrigin(parent_room, door.direction);
@@ -38,10 +43,13 @@ namespace Dungeon
                 return GetOrCreateRoom(neighborOrigin, neighborTemplate, difficulty, expandNeighborsOnce: true);
             }
 
-            // If no doors exist, just spawn next to the parent origin (fallback).
+            // important: fallback spawn if no doors exist
             var fallbackOrigin = new TilePos(parent_room.origin.x + 1, parent_room.origin.y);
             return GetOrCreateRoom(fallbackOrigin, PickRoomTemplate(difficulty), difficulty, expandNeighborsOnce: true);
         }
+
+
+/***** get existing room or create a new room instance *****/
 
         private RoomInstance GetOrCreateRoom(TilePos origin, RoomDefinition template, int difficulty, bool expandNeighborsOnce)
         {
@@ -65,9 +73,12 @@ namespace Dungeon
             return room;
         }
 
+
+/***** expand doors into neighbor rooms once *****/
+
         private void ExpandDoorsForRoomOnce(RoomInstance room, int neighborDifficulty)
         {
-            // When entering a room, spawn adjacent rooms for its doors.
+            // important: entering a room spawns adjacent rooms for its doors
             foreach (var door in room.definition.doorDefinitions)
             {
                 var neighborOrigin = ComputeNeighborOrigin(room, door.direction);
@@ -78,6 +89,9 @@ namespace Dungeon
                 GetOrCreateRoom(neighborOrigin, neighborTemplate, neighborDifficulty, expandNeighborsOnce: false);
             }
         }
+
+
+/***** compute origin for a neighboring room *****/
 
         private TilePos ComputeNeighborOrigin(RoomInstance parent, DoorDirection direction)
         {
@@ -101,12 +115,15 @@ namespace Dungeon
             return new TilePos(parent.origin.x + dx, parent.origin.y + dy);
         }
 
+
+/***** pick a room template for a difficulty value *****/
+
         private RoomDefinition PickRoomTemplate(int difficulty)
         {
             if (roomTemplates == null || roomTemplates.Count == 0)
                 return null;
 
-            // Filter by difficulty range. If none match, pick the closest.
+            // important: filter by difficulty range
             var candidates = roomTemplates.FindAll(r =>
                 r != null && difficulty >= r.minDifficultyInclusive && difficulty <= r.maxDifficultyInclusive);
 
@@ -116,12 +133,15 @@ namespace Dungeon
             return candidates[UnityEngine.Random.Range(0, candidates.Count)];
         }
 
+
+/***** spawn logical content inside a room *****/
+
         private void SpawnRoomLogicalContent(RoomInstance room)
         {
             if (room.definition == null)
                 return;
 
-            // Interactables (chests etc.) already placed in the room.
+            // important: interactables are placed at room creation
             foreach (var placement in room.definition.interactablePlacements)
             {
                 if (placement.interactable == null)
@@ -133,6 +153,9 @@ namespace Dungeon
                     room.interactables.Add(go);
             }
         }
+
+
+/***** instantiate an interactable for a room *****/
 
         private InteractableBase CreateInteractable(InteractableDefinition definition, TilePos worldTile)
         {
@@ -159,14 +182,18 @@ namespace Dungeon
             return interactable;
         }
 
-        // Required function: spawn_npc(difficulty)
-        // In this prototype, it spawns NPCs into the given room based on npcSpawnPoints.
+
+
+/********** NPC SPAWNING **********/
+
+/***** spawn room npcs on first visit *****/
+
         public void spawn_npc(int difficulty, RoomInstance room)
         {
             if (room == null || room.definition == null)
                 return;
 
-            // Spawn once per room visit.
+            // important: spawn once per room visit
             if (room.npcs.Count > 0)
                 return;
 
@@ -179,7 +206,9 @@ namespace Dungeon
             }
         }
 
-        // Additional spawning utility for events (prototype).
+
+/***** spawn additional npcs for events *****/
+
         public void spawn_npc_more(int difficulty, RoomInstance room, int count, List<NpcDefinition> npcPoolOverride = null)
         {
             if (room == null || room.definition == null)
@@ -199,7 +228,7 @@ namespace Dungeon
             if (pool == null || pool.Count == 0)
                 return;
 
-            // Try to spawn on unused spawn points.
+            // important: try to spawn on unused spawn points
             for (int i = 0; i < count; i++)
             {
                 if (i >= room.definition.npcSpawnPoints.Count)
@@ -213,7 +242,7 @@ namespace Dungeon
                     continue;
                 }
 
-                // Spawn using a pool override.
+                // important: spawn using a pool override
                 var template = pool[UnityEngine.Random.Range(0, pool.Count)];
                 if (template == null)
                     continue;
@@ -227,6 +256,9 @@ namespace Dungeon
             }
         }
 
+
+/***** create npc using default template pool *****/
+
         private ActorBase CreateNpc(TilePos worldTile, int difficulty)
         {
             if (npcTemplates == null || npcTemplates.Count == 0)
@@ -235,7 +267,7 @@ namespace Dungeon
                 return null;
             }
 
-            // For now, pick random NPC template; scale stats by difficulty.
+            // important: pick random npc template and scale stats by difficulty
             var template = npcTemplates[UnityEngine.Random.Range(0, npcTemplates.Count)];
             if (template == null)
                 return null;
@@ -254,7 +286,7 @@ namespace Dungeon
 
             actor.tilePosition = worldTile;
 
-            // Simple stat scaling for endless difficulty.
+            // important: simple stat scaling for endless difficulty
             float scale = 1f + (difficulty * 0.1f);
 
             if (actor.inventory == null)
@@ -267,6 +299,9 @@ namespace Dungeon
 
             return actor;
         }
+
+
+/***** create npc using an explicit template *****/
 
         private ActorBase CreateNpcFromTemplate(TilePos worldTile, int difficulty, NpcDefinition template)
         {

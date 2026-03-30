@@ -9,14 +9,26 @@ namespace Dungeon
         public List<ItemInstance> slots = new List<ItemInstance>();
 
         [Header("Optional: where dropped loot spawns")]
-        public GameObject droppedItemPrefab; // optional for logic-only prototype
+        public GameObject droppedItemPrefab; // important: optional for logic-only prototype
+
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** initialize inventory slots list *****/
 
         private void Awake()
         {
-            // Ensure the inventory list is non-null even in newly created prototype objects.
+            // important: ensure slots list is non-null
             if (slots == null)
                 slots = new List<ItemInstance>();
         }
+
+
+
+/********** SLOT ACCESS **********/
+
+/***** get item instance for a slot index *****/
 
         public ItemInstance GetItemInSlot(int slotIndex)
         {
@@ -24,6 +36,9 @@ namespace Dungeon
                 return null;
             return slots[slotIndex];
         }
+
+
+/***** iterate droppable items in inventory *****/
 
         public IEnumerable<ItemInstance> GetAllDroppableItems()
         {
@@ -37,6 +52,9 @@ namespace Dungeon
             }
         }
 
+
+/***** check if any droppable items exist *****/
+
         public bool HasDroppableItems()
         {
             foreach (var _ in GetAllDroppableItems())
@@ -44,14 +62,19 @@ namespace Dungeon
             return false;
         }
 
-        // Required function: drop_item(game_object, item_position=None)
-        // If item_position is null, drops at the source's TilePosition.
-        // If item_position is provided, drops at that tile instead.
-        // If item_slotIndex is provided, drops only that slot.
+
+
+/********** DROPPING **********/
+
+/***** drop items from a drop source *****/
+
         public void drop_item(IDropSource game_object, TilePos? item_position = null)
         {
             drop_item(game_object, item_slotIndex: null, item_position: item_position);
         }
+
+
+/***** drop a specific slot or all slots *****/
 
         public void drop_item(IDropSource game_object, int? item_slotIndex = null, TilePos? item_position = null)
         {
@@ -60,8 +83,7 @@ namespace Dungeon
 
             var sourcePos = item_position ?? game_object.TilePosition;
 
-            // If we have a dropped item prefab, spawn physical loot objects;
-            // otherwise this is still "logic-correct" and will clear inventory slots.
+            // important: if droppedItemPrefab is null, drops are logic-only
             bool shouldSpawnViews = droppedItemPrefab != null;
 
             if (item_slotIndex.HasValue)
@@ -88,7 +110,7 @@ namespace Dungeon
             }
             else
             {
-                // Dropping all droppable items: remove them from inventory.
+                // important: dropping all droppable items clears slots
                 for (int i = 0; i < slots.Count; i++)
                 {
                     var slot = slots[i];

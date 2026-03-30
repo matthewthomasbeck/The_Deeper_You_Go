@@ -26,6 +26,12 @@ namespace Dungeon
         public bool MagicSelected => magicToggle != null && magicToggle.isOn;
         public bool StealthSelected => stealthToggle != null && stealthToggle.isOn;
 
+
+
+/********** UNITY LIFECYCLE **********/
+
+/***** wire toggle listeners and hide menu *****/
+
         private void Awake()
         {
             if (root == null)
@@ -38,9 +44,12 @@ namespace Dungeon
             Hide();
         }
 
+
+/***** toggle menu with a hotkey *****/
+
         private void Update()
         {
-            // Prototype hotkey.
+            // important: prototype hotkey
             if (Input.GetKeyDown(KeyCode.Tab))
             {
                 if (root != null && root.activeSelf) Hide();
@@ -48,16 +57,31 @@ namespace Dungeon
             }
         }
 
+
+
+/********** UI CONTROL **********/
+
+/***** show skill tree menu *****/
+
         public void Show()
         {
             if (root != null) root.SetActive(true);
             EnforceMaxSelected();
         }
 
+
+/***** hide skill tree menu *****/
+
         public void Hide()
         {
             if (root != null) root.SetActive(false);
         }
+
+
+
+/********** SELECTION RULES **********/
+
+/***** enforce max selected categories *****/
 
         private void EnforceMaxSelected()
         {
@@ -72,8 +96,7 @@ namespace Dungeon
                 return;
             }
 
-            // If we exceeded, turn off the last-changed toggle isn't directly tracked here,
-            // so we just turn off one in priority order (stealth -> magic -> base stats).
+            // important: if exceeded, turn off one toggle by priority
             if (stealthToggle != null && stealthToggle.isOn)
                 stealthToggle.isOn = false;
             else if (magicToggle != null && magicToggle.isOn)
