@@ -31,6 +31,11 @@ namespace Dungeon
         HealInstant,
         PoisonOverTime,
         RegenerationOverTime,
+
+        // Generic/extensible:
+        StatDeltaInstant,     // applies 'amount' to a chosen stat immediately (negative = damage/drain)
+        StatDeltaOverTime,    // applies 'amount' to a chosen stat per tick for duration
+        StatusEffect,         // applies a named status for duration
     }
 
     public enum StatKind
@@ -39,6 +44,15 @@ namespace Dungeon
         Stamina,
         Magica,
         Experience,
+    }
+
+    public enum StatusEffectKind
+    {
+        Blindness,
+        // Future examples:
+        // Slow,
+        // Stun,
+        // Silence,
     }
 
     public enum DamageElement

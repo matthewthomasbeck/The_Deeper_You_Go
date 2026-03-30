@@ -23,6 +23,14 @@
 .DS_Store
 Thumbs.db
 
+# Unity template/sample content (optional, usually noise)
+Assets/TutorialInfo/
+Assets/Readme.asset
+Assets/Readme.asset.meta
+Assets/Settings/
+Assets/InputSystem_Actions.inputactions
+Assets/InputSystem_Actions.inputactions.meta
+
 # Keep your source content tracked
 !Assets/
 !Packages/

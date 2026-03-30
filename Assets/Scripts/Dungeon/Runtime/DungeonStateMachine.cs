@@ -68,7 +68,7 @@ namespace Dungeon
                     var evt = currentRoom.definition.candidateEvents[Random.Range(0, currentRoom.definition.candidateEvents.Count)];
                     if (evt != null && evt.canTriggerRandomly && Random.value <= evt.randomChance * randomEventChanceMultiplier)
                     {
-                        eventSystem.spawn_event(evt, currentRoom, hero, generator);
+                        eventSystem.spawn_event(evt, difficulty, currentRoom, hero, generator);
                     }
                 }
             }
@@ -97,7 +97,7 @@ namespace Dungeon
                     if (evt == null)
                         continue;
                     if (evt.canTriggerOnEnter)
-                        eventSystem.spawn_event(evt, room, hero, generator);
+                        eventSystem.spawn_event(evt, difficulty, room, hero, generator);
                 }
             }
         }

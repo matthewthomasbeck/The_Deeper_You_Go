@@ -29,6 +29,7 @@ namespace Dungeon
         public InventoryComponent inventory;
 
         private readonly List<ActiveStatusEffect> activeStatuses = new List<ActiveStatusEffect>();
+        private readonly List<ActiveNamedStatus> activeNamedStatuses = new List<ActiveNamedStatus>();
 
         public int Health
         {
@@ -94,10 +95,7 @@ namespace Dungeon
 
                 if (s.tickCooldownSeconds <= 0f && s.remainingSeconds > 0f)
                 {
-                    if (s.kind == ActionKind.PoisonOverTime)
-                        ApplyDamage(s.tickDamage);
-                    else if (s.kind == ActionKind.RegenerationOverTime)
-                        ApplyHeal(s.tickDamage);
+                    ApplyStatDelta(s.statKind, s.deltaPerTick);
 
                     s.tickCooldownSeconds += Mathf.Max(0.001f, s.tickIntervalSeconds);
                 }
@@ -106,6 +104,16 @@ namespace Dungeon
                     activeStatuses.RemoveAt(i);
                 else
                     activeStatuses[i] = s;
+            }
+
+            for (int i = activeNamedStatuses.Count - 1; i >= 0; i--)
+            {
+                var s = activeNamedStatuses[i];
+                s.remainingSeconds -= dt;
+                if (s.remainingSeconds <= 0f)
+                    activeNamedStatuses.RemoveAt(i);
+                else
+                    activeNamedStatuses[i] = s;
             }
         }
 
@@ -117,14 +125,25 @@ namespace Dungeon
             switch (definition.kind)
             {
                 case ActionKind.DamageInstant:
-                    ApplyDamage(definition.amount);
+                    ApplyStatDelta(StatKind.Health, -Mathf.Abs(definition.amount));
                     break;
                 case ActionKind.HealInstant:
-                    ApplyHeal(definition.amount);
+                    ApplyStatDelta(StatKind.Health, Mathf.Abs(definition.amount));
                     break;
                 case ActionKind.PoisonOverTime:
+                    AddOverTime(StatKind.Health, -Mathf.Abs(definition.amount), definition.durationSeconds, definition.tickIntervalSeconds);
+                    break;
                 case ActionKind.RegenerationOverTime:
-                    AddOverTime(definition);
+                    AddOverTime(StatKind.Health, Mathf.Abs(definition.amount), definition.durationSeconds, definition.tickIntervalSeconds);
+                    break;
+                case ActionKind.StatDeltaInstant:
+                    ApplyStatDelta(definition.statKind, definition.amount);
+                    break;
+                case ActionKind.StatDeltaOverTime:
+                    AddOverTime(definition.statKind, definition.amount, definition.durationSeconds, definition.tickIntervalSeconds);
+                    break;
+                case ActionKind.StatusEffect:
+                    AddNamedStatus(definition.statusKind, definition.durationSeconds);
                     break;
                 default:
                     Debug.LogWarning($"Unhandled ActionKind: {definition.kind}");
@@ -145,36 +164,67 @@ namespace Dungeon
             // Future: UI / loot selection.
         }
 
-        private void ApplyDamage(int amount)
+        private void ApplyStatDelta(StatKind statKind, int delta)
         {
-            if (amount <= 0)
+            if (delta == 0)
                 return;
 
-            Health -= amount;
-            if (Health <= 0 && !isDead)
-                Die();
+            switch (statKind)
+            {
+                case StatKind.Health:
+                    Health = Mathf.Clamp(Health + delta, 0, MaxHealth);
+                    if (Health <= 0 && !isDead)
+                        Die();
+                    break;
+                case StatKind.Stamina:
+                    Stamina = Mathf.Clamp(Stamina + delta, 0, MaxStamina);
+                    break;
+                case StatKind.Magica:
+                    Magica = Mathf.Clamp(Magica + delta, 0, MaxMagica);
+                    break;
+                case StatKind.Experience:
+                    // Interactables don't track XP in this prototype; ignore.
+                    break;
+                default:
+                    Debug.LogWarning($"Unhandled StatKind: {statKind}");
+                    break;
+            }
         }
 
-        private void ApplyHeal(int amount)
-        {
-            if (amount <= 0)
-                return;
-
-            Health = Mathf.Min(MaxHealth, Health + amount);
-        }
-
-        private void AddOverTime(ActionDefinition definition)
+        private void AddOverTime(StatKind statKind, int deltaPerTick, float durationSeconds, float tickIntervalSeconds)
         {
             var s = new ActiveStatusEffect
             {
-                kind = definition.kind,
-                remainingSeconds = Mathf.Max(0.01f, definition.durationSeconds),
-                tickIntervalSeconds = Mathf.Max(0.01f, definition.tickIntervalSeconds),
-                tickCooldownSeconds = Mathf.Max(0.01f, definition.tickIntervalSeconds),
-                tickDamage = definition.amount,
+                statKind = statKind,
+                remainingSeconds = Mathf.Max(0.01f, durationSeconds),
+                tickIntervalSeconds = Mathf.Max(0.01f, tickIntervalSeconds),
+                tickCooldownSeconds = Mathf.Max(0.01f, tickIntervalSeconds),
+                deltaPerTick = deltaPerTick,
             };
 
             activeStatuses.Add(s);
+        }
+
+        private void AddNamedStatus(StatusEffectKind kind, float durationSeconds)
+        {
+            if (durationSeconds <= 0f)
+                durationSeconds = 0.01f;
+
+            for (int i = 0; i < activeNamedStatuses.Count; i++)
+            {
+                if (activeNamedStatuses[i].kind != kind)
+                    continue;
+                var s = activeNamedStatuses[i];
+                s.remainingSeconds = Mathf.Max(s.remainingSeconds, durationSeconds);
+                activeNamedStatuses[i] = s;
+                return;
+            }
+
+            activeNamedStatuses.Add(new ActiveNamedStatus
+            {
+                kind = kind,
+                remainingSeconds = durationSeconds,
+            });
         }
 
         private void Die()
@@ -187,13 +237,20 @@ namespace Dungeon
         [Serializable]
         private struct ActiveStatusEffect
         {
-            public ActionKind kind;
+            public StatKind statKind;
             public float remainingSeconds;
 
             public float tickIntervalSeconds;
             public float tickCooldownSeconds;
 
-            public int tickDamage;
+            public int deltaPerTick;
+        }
+
+        [Serializable]
+        private struct ActiveNamedStatus
+        {
+            public StatusEffectKind kind;
+            public float remainingSeconds;
         }
     }
 }

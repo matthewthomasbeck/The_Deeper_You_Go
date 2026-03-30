@@ -22,6 +22,16 @@ namespace Dungeon
         public bool canTriggerRandomly = false;
         [Range(0f, 1f)] public float randomChance = 0.1f;
 
+        [Header("Difficulty gating / scaling")]
+        [Tooltip("If difficulty is below this, the event will not trigger.")]
+        public int minDifficultyInclusive = 0;
+
+        [Tooltip("If difficulty is above this, the event will not trigger (set very high to ignore).")]
+        public int maxDifficultyInclusive = 9999;
+
+        [Tooltip("Scales all action 'amount' values. Example: 1.0 = base, 2.0 = double.")]
+        public AnimationCurve actionAmountMultiplierByDifficulty = AnimationCurve.Linear(0, 1f, 50, 2f);
+
         [Header("Effect Payload (actions)")]
         public bool applyToHero = false;
         public List<ActionDefinition> heroActions = new List<ActionDefinition>();

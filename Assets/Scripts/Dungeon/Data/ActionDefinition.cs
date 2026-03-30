@@ -15,6 +15,12 @@ namespace Dungeon
         public DamageElement element = DamageElement.Physical;
         public int amount = 1;
 
+        [Header("Stat Targeting (for StatDelta*)")]
+        public StatKind statKind = StatKind.Health;
+
+        [Header("Status (for StatusEffect)")]
+        public StatusEffectKind statusKind = StatusEffectKind.Blindness;
+
         [Header("Over-Time (Poison / Regeneration)")]
         public float durationSeconds = 5f;
         public float tickIntervalSeconds = 1f;
@@ -23,7 +29,9 @@ namespace Dungeon
 
         public bool IsOverTime =>
             kind == ActionKind.PoisonOverTime ||
-            kind == ActionKind.RegenerationOverTime;
+            kind == ActionKind.RegenerationOverTime ||
+            kind == ActionKind.StatDeltaOverTime ||
+            kind == ActionKind.StatusEffect;
     }
 }
 
