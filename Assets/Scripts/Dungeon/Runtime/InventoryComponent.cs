@@ -76,7 +76,7 @@ namespace Dungeon
 
 /***** drop a specific slot or all slots *****/
 
-        public void drop_item(IDropSource game_object, int? item_slotIndex = null, TilePos? item_position = null)
+        public void drop_item(IDropSource game_object, int? item_slotIndex, TilePos? item_position = null)
         {
             if (game_object == null)
                 return;

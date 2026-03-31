@@ -52,6 +52,8 @@ namespace Dungeon
         [Header("Inventory / Loot")]
         public InventoryComponent inventory;
 
+        public InventoryComponent Inventory => inventory;
+
         private readonly List<ActiveStatusEffect> activeStatuses = new List<ActiveStatusEffect>();
         private readonly List<ActiveNamedStatus> activeNamedStatuses = new List<ActiveNamedStatus>();
 
