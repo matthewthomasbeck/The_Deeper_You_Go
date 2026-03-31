@@ -12,7 +12,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: daf1ea485b00c4d178ddd48e70ae104b, type: 3}
   m_Name: RoomTilesetDefinition
   m_EditorClassIdentifier: 
-  empty: {fileID: 0}
-  wall: {fileID: 0}
-  floorWood: {fileID: 0}
-  carpet: {fileID: 0}
+  empty: {fileID: 11400000, guid: bc4d7bdb3ab5a4cd78ef34752581729b, type: 2}
+  floorWood: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
+  carpetCenter: {fileID: 11400000, guid: 23bcb1375cdd1447e8a102e98f215cc1, type: 2}
+  wallCorner: {fileID: 11400000, guid: bc4d7bdb3ab5a4cd78ef34752581729b, type: 2}
+  wallTop: {fileID: 11400000, guid: 8e8543481fae442ccb2957f83e5d1665, type: 2}
+  wallBottom: {fileID: 11400000, guid: 599a408ef791b4830b918c2828e63de1, type: 2}
+  wallLeft: {fileID: 11400000, guid: 67aa4ed2589d6431496f905864eeee0a, type: 2}
+  wallRight: {fileID: 11400000, guid: ab91a94ecaadc47a0b45b8d5b3a0cb33, type: 2}
+  carpetTop: {fileID: 11400000, guid: 1775eabfceb7742948a36ef1c4328332, type: 2}
+  carpetBottom: {fileID: 11400000, guid: bf19bf27238154af69346dddc8d51da2, type: 2}
+  carpetLeft: {fileID: 11400000, guid: f2e462791a0ac435f8bcafc51e766956, type: 2}
+  carpetRight: {fileID: 11400000, guid: de6b13a76ae394db3801cedd887a999e, type: 2}
+  carpetTopLeft: {fileID: 11400000, guid: 4b8be5b662c374e8a904ad65db325ea7, type: 2}
+  carpetTopRight: {fileID: 11400000, guid: 2ac2fbef0511a4fd79bbaba32be17237, type: 2}
+  carpetBottomLeft: {fileID: 11400000, guid: 57b35628e4b3c4901969d02a8718ab67, type: 2}
+  carpetBottomRight: {fileID: 11400000, guid: e9d24871862734f13aa131d9770dd72d, type: 2}

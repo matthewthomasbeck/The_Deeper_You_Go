@@ -39,6 +39,9 @@ namespace Dungeon
         public string roomId = "room_unnamed";
         public RoomSizeCategory size = RoomSizeCategory.Small;
 
+        [Header("Prefab")]
+        public GameObject roomPrefab;
+
         [Header("Difficulty range")]
         public int minDifficultyInclusive = 0;
         public int maxDifficultyInclusive = 9999;

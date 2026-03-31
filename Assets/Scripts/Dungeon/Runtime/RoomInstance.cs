@@ -10,6 +10,8 @@ namespace Dungeon
         // Grid origin of the room.
         public TilePos origin;
 
+        public UnityEngine.GameObject prefabInstance;
+
         public bool visited = false;
         public readonly HashSet<string> triggeredEventIds = new HashSet<string>();
 

@@ -141,6 +141,14 @@ namespace Dungeon
             if (room.definition == null)
                 return;
 
+            // important: instantiate room prefab for visuals
+            if (room.definition.roomPrefab != null)
+            {
+                var worldPos = new Vector3(room.origin.x, room.origin.y, 0f);
+                var instance = Instantiate(room.definition.roomPrefab, worldPos, Quaternion.identity);
+                room.prefabInstance = instance;
+            }
+
             // important: interactables are placed at room creation
             foreach (var placement in room.definition.interactablePlacements)
             {

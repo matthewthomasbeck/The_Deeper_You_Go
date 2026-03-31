@@ -31,6 +31,15 @@ Assets/Settings/
 Assets/InputSystem_Actions.inputactions
 Assets/InputSystem_Actions.inputactions.meta
 
+# Tile palette + generated tiles for rooms
+Assets/Art/Tilesets/roomsPalette.prefab
+Assets/Art/Tilesets/roomsPalette.prefab.meta
+Assets/Art/Tilesets/rooms_*.asset
+Assets/Art/Tilesets/rooms_*.asset.meta
+
+# Scene template noise
+ProjectSettings/SceneTemplateSettings.json
+
 # Keep your source content tracked
 !Assets/
 !Packages/
