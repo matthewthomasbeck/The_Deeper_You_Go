@@ -6,13 +6,17 @@ namespace Dungeon
     [CreateAssetMenu(menuName = "Dungeon/Room Tileset Definition", fileName = "RoomTilesetDefinition")]
     public class RoomTilesetDefinition : ScriptableObject
     {
+        [Tooltip("Background BSP carves through (e.g. rooms_9 pitch black).")]
         public TileBase empty;
 
         [Header("Floor")]
+        [Tooltip("Walkable floor (e.g. rooms_11).")]
         public TileBase floorWood;
+        [Tooltip("Carpet / accent floor; project default is same as floorWood.")]
         public TileBase carpetCenter;
 
         [Header("Wall ring")]
+        [Tooltip("All wall kinds default to rooms_0 in the project tileset asset.")]
         public TileBase wallCorner;
         public TileBase wallTop;
         public TileBase wallBottom;
