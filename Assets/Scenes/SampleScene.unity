@@ -182,7 +182,7 @@ Camera:
   far clip plane: 1000
   field of view: 60
   orthographic: 1
-  orthographic size: 30
+  orthographic size: 280
   m_Depth: -1
   m_CullingMask:
     serializedVersion: 2
@@ -207,7 +207,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 32, y: 24, z: -10}
+  m_LocalPosition: {x: 320, y: 240, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -493,17 +493,24 @@ MonoBehaviour:
   originCell: {x: 0, y: 0, z: 0}
   createGridIfMissing: 1
   parameters:
-    mapWidth: 64
-    mapHeight: 48
-    minLeafSize: 10
-    minRoomSize: 4
-    roomPadding: 1
-    maxDepth: 12
+    mapWidth: 640
+    mapHeight: 480
+    enforceMinimumDungeonFootprint: 1
+    minimumDungeonWidth: 640
+    minimumDungeonHeight: 480
+    minLeafSize: 96
+    minRoomSize: 13
+    maxRoomSize: 35
+    roomPadding: 18
+    roomPlacementCenterBias: 0.42
+    maxDepth: 20
     splitLongerAxisFirst: 1
   useFixedSeed: 0
   fixedSeed: 12345
   generateOnPlay: 1
   verboseLogs: 1
+  frameMainCameraOnDungeon: 1
+  cameraFitPadding: 0.06
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

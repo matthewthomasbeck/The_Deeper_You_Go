@@ -18,10 +18,23 @@ namespace Dungeon
         [Header("Wall ring")]
         [Tooltip("All wall kinds default to rooms_0 in the project tileset asset.")]
         public TileBase wallCorner;
+        [Tooltip("North/top edge touching floor below (e.g. rooms_0).")]
         public TileBase wallTop;
+        [Tooltip("Cell above wallTop — second story of the top trim (e.g. rooms_6).")]
+        public TileBase wallTopCap;
         public TileBase wallBottom;
         public TileBase wallLeft;
         public TileBase wallRight;
+
+        [Header("Hallway ↔ room breach trim (uses wallTop / rooms_0 for row above hallway)")]
+        [Tooltip("West breach: cell below hallway segment (e.g. rooms_2).")]
+        public TileBase hallwayBreachWestLower;
+        [Tooltip("West breach: second row above hallway, above wallTop (e.g. rooms_4).")]
+        public TileBase hallwayBreachWestUpperCap;
+        [Tooltip("East breach: cell below hallway segment (e.g. rooms_1).")]
+        public TileBase hallwayBreachEastLower;
+        [Tooltip("East breach: second row above hallway, above wallTop (e.g. rooms_3).")]
+        public TileBase hallwayBreachEastUpperCap;
 
         [Header("Carpet borders")]
         public TileBase carpetTop;
@@ -43,6 +56,7 @@ namespace Dungeon
             return kind switch
             {
                 RoomTileKind.FloorWood => floorWood,
+                RoomTileKind.CorridorFloor => floorWood,
                 RoomTileKind.WallCorner => wallCorner,
                 RoomTileKind.WallTop => wallTop,
                 RoomTileKind.WallBottom => wallBottom,

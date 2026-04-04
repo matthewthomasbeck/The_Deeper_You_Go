@@ -6,7 +6,7 @@ namespace Dungeon
     /// <summary>
     /// Binary space partition: recursively splits the map into rectangles, carves a room in each leaf,
     /// then connects sibling subtrees with L-shaped corridors. Result is a <see cref="RoomGrid"/> of
-    /// <see cref="RoomTileKind.FloorWood"/> carved into <see cref="RoomTileKind.Empty"/>.
+    /// <see cref="RoomTileKind.FloorWood"/> (rooms) and <see cref="RoomTileKind.CorridorFloor"/> (halls in void) carved into <see cref="RoomTileKind.Empty"/>.
     /// </summary>
     public static class BspDungeonGenerator
     {
@@ -24,19 +24,21 @@ namespace Dungeon
         /// </summary>
         public static RoomGrid Build(BspDungeonParameters p, int? randomSeed = null)
         {
-            if (p.mapWidth < 8 || p.mapHeight < 8)
+            p.GetEffectiveMapDimensions(out int mapW, out int mapH);
+
+            if (mapW < 8 || mapH < 8)
                 throw new ArgumentException("Map must be at least 8×8.", nameof(p));
 
             if (randomSeed.HasValue)
                 UnityEngine.Random.InitState(randomSeed.Value);
 
-            var root = new Node { X = 0, Y = 0, W = p.mapWidth, H = p.mapHeight };
+            var root = new Node { X = 0, Y = 0, W = mapW, H = mapH };
             Split(root, p, 0);
             CarveRooms(root, p);
 
-            var grid = new RoomGrid(p.mapWidth, p.mapHeight);
-            for (int y = 0; y < p.mapHeight; y++)
-            for (int x = 0; x < p.mapWidth; x++)
+            var grid = new RoomGrid(mapW, mapH);
+            for (int y = 0; y < mapH; y++)
+            for (int x = 0; x < mapW; x++)
                 grid.Set(x, y, RoomTileKind.Empty);
 
             PaintRooms(grid, root);
@@ -112,21 +114,27 @@ namespace Dungeon
             {
                 int innerW = n.W - 2 * p.roomPadding;
                 int innerH = n.H - 2 * p.roomPadding;
-                if (innerW < p.minRoomSize || innerH < p.minRoomSize)
+
+                int minOdd = OddUp(Mathf.Max(13, p.minRoomSize));
+                int maxOdd = OddDown(Mathf.Min(35, p.maxRoomSize));
+                if (maxOdd < minOdd)
+                    maxOdd = minOdd;
+
+                if (innerW < minOdd || innerH < minOdd)
                 {
                     n.HasRoom = false;
                     return;
                 }
 
-                int maxRw = innerW;
-                int maxRh = innerH;
-                int rw = UnityEngine.Random.Range(p.minRoomSize, maxRw + 1);
-                int rh = UnityEngine.Random.Range(p.minRoomSize, maxRh + 1);
-                rw = Mathf.Min(rw, maxRw);
-                rh = Mathf.Min(rh, maxRh);
+                int maxRw = OddDown(innerW);
+                int maxRh = OddDown(innerH);
+                int rw = RandomOddInclusive(minOdd, maxRw);
+                int rh = RandomOddInclusive(minOdd, maxRh);
 
-                int ox = UnityEngine.Random.Range(n.X + p.roomPadding, n.X + p.roomPadding + (innerW - rw) + 1);
-                int oy = UnityEngine.Random.Range(n.Y + p.roomPadding, n.Y + p.roomPadding + (innerH - rh) + 1);
+                int spanX = innerW - rw;
+                int spanY = innerH - rh;
+                int ox = n.X + p.roomPadding + RandomPlacementOffset(spanX, p.roomPlacementCenterBias);
+                int oy = n.Y + p.roomPadding + RandomPlacementOffset(spanY, p.roomPlacementCenterBias);
 
                 n.RoomX = ox;
                 n.RoomY = oy;
@@ -138,6 +146,46 @@ namespace Dungeon
 
             CarveRooms(n.Left, p);
             CarveRooms(n.Right, p);
+        }
+
+        private static int OddUp(int v)
+        {
+            return (v % 2 == 0) ? v + 1 : v;
+        }
+
+        private static int OddDown(int v)
+        {
+            return (v % 2 == 0) ? v - 1 : v;
+        }
+
+        /// <summary>Uniform random odd in [minOdd, maxOdd] inclusive; both arguments should already be odd.</summary>
+        private static int RandomOddInclusive(int minOdd, int maxOdd)
+        {
+            if (maxOdd < minOdd)
+                return minOdd;
+            int steps = (maxOdd - minOdd) / 2 + 1;
+            return minOdd + 2 * UnityEngine.Random.Range(0, steps);
+        }
+
+        /// <summary>
+        /// Random offset into [0, span], optionally trimming both ends so rooms tend toward the middle of the leaf.
+        /// </summary>
+        private static int RandomPlacementOffset(int span, float centerBias)
+        {
+            if (span <= 0)
+                return 0;
+
+            float b = Mathf.Clamp01(centerBias);
+            int trimEach = (int)(span * b * 0.5f);
+            int lo = trimEach;
+            int hi = span - trimEach;
+            if (hi < lo)
+            {
+                lo = 0;
+                hi = span;
+            }
+
+            return UnityEngine.Random.Range(lo, hi + 1);
         }
 
         private static void PaintRooms(RoomGrid grid, Node n)
@@ -208,7 +256,7 @@ namespace Dungeon
             int lo = Mathf.Min(x0, x1);
             int hi = Mathf.Max(x0, x1);
             for (int x = lo; x <= hi; x++)
-                grid.Set(x, y, RoomTileKind.FloorWood);
+                TryCarveCorridor(grid, x, y);
         }
 
         private static void CarveVertical(RoomGrid grid, int y0, int y1, int x)
@@ -216,7 +264,14 @@ namespace Dungeon
             int lo = Mathf.Min(y0, y1);
             int hi = Mathf.Max(y0, y1);
             for (int y = lo; y <= hi; y++)
-                grid.Set(x, y, RoomTileKind.FloorWood);
+                TryCarveCorridor(grid, x, y);
+        }
+
+        /// <summary>Carve hallway in void only; leaves <see cref="RoomTileKind.FloorWood"/> so east/west breaches can be detected.</summary>
+        private static void TryCarveCorridor(RoomGrid grid, int x, int y)
+        {
+            if (grid.Get(x, y) == RoomTileKind.Empty)
+                grid.Set(x, y, RoomTileKind.CorridorFloor);
         }
     }
 }

@@ -11,7 +11,7 @@ namespace Dungeon
     [DefaultExecutionOrder(-100)]
     public class BspDungeonBootstrap : MonoBehaviour
     {
-        [Tooltip("Tile references: Empty = base (rooms_9), FloorWood = carved floor (rooms_11), wall slots = perimeter (rooms_0).")]
+        [Tooltip("Empty/FloorWood required; wall slots: left rooms_8, right rooms_7, bottom rooms_5, top rooms_0 + wallTopCap rooms_6.")]
         public RoomTilesetDefinition tileset;
 
         [Tooltip("Optional. Leave empty to auto-create under this GameObject when createGridIfMissing is enabled.")]
@@ -33,6 +33,25 @@ namespace Dungeon
 
         [Tooltip("Log each step to the Console (disable after you confirm it works).")]
         public bool verboseLogs = true;
+
+        [Tooltip("After generate, move Camera.main to the dungeon center and set orthographic size so the full grid fits the Game view.")]
+        public bool frameMainCameraOnDungeon = true;
+
+        [Tooltip("Extra margin around the dungeon when framing (fraction of half-extent).")]
+        [Range(0f, 0.5f)]
+        public float cameraFitPadding = 0.06f;
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (parameters == null)
+                return;
+            if (!parameters.enforceMinimumDungeonFootprint)
+                return;
+            parameters.mapWidth = Mathf.Max(parameters.mapWidth, parameters.minimumDungeonWidth);
+            parameters.mapHeight = Mathf.Max(parameters.mapHeight, parameters.minimumDungeonHeight);
+        }
+#endif
 
         private void Start()
         {
@@ -91,8 +110,9 @@ namespace Dungeon
             }
 
             int? seed = useFixedSeed ? fixedSeed : (int?)null;
+            parameters.GetEffectiveMapDimensions(out int genW, out int genH);
             if (verboseLogs)
-                Debug.Log($"[BspDungeon] Building BSP {parameters.mapWidth}×{parameters.mapHeight}…", this);
+                Debug.Log($"[BspDungeon] Building BSP {genW}×{genH} (effective; inspector had {parameters.mapWidth}×{parameters.mapHeight})…", this);
 
             var floorGrid = BspDungeonGenerator.Build(parameters, seed);
 
@@ -100,9 +120,35 @@ namespace Dungeon
                 Debug.Log("[BspDungeon] Painting tilemap (base → floors → walls)…", this);
 
             BspTilemapPainter.Paint(tilemap, originCell, tileset, floorGrid);
+            BspTilemapPainter.CleanUpRooms(tilemap, originCell, tileset, floorGrid);
+
+            FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 
             if (verboseLogs)
-                Debug.Log("[BspDungeon] Done. Check Game view with an orthographic camera centered on the map.", this);
+                Debug.Log(
+                    $"[BspDungeon] Done. Grid cells: {floorGrid.width}×{floorGrid.height}. If the void still looks small, confirm this log matches expectations.",
+                    this);
+        }
+
+        private void FrameMainCameraOnDungeon(int gridW, int gridH)
+        {
+            if (!frameMainCameraOnDungeon)
+                return;
+
+            var cam = Camera.main;
+            if (cam == null || !cam.orthographic)
+                return;
+
+            float cx = originCell.x + gridW * 0.5f;
+            float cy = originCell.y + gridH * 0.5f;
+            var pos = cam.transform.position;
+            cam.transform.position = new Vector3(cx, cy, pos.z);
+
+            float aspect = (float)Screen.width / Mathf.Max(1, Screen.height);
+            float halfH = gridH * 0.5f;
+            float halfW = gridW * 0.5f;
+            float fit = Mathf.Max(halfH, halfW / aspect) * (1f + cameraFitPadding);
+            cam.orthographicSize = fit;
         }
 
         private Tilemap CreateRuntimeGridAndTilemap()

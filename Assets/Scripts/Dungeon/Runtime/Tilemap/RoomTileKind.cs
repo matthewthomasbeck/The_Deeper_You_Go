@@ -4,6 +4,8 @@ namespace Dungeon
     {
         Empty = 0,
         FloorWood = 1,
+        /// <summary>Hallway carved through void; adjacent to <see cref="FloorWood"/> marks an east/west breach for trim.</summary>
+        CorridorFloor = 2,
 
         // wall ring
         WallCorner = 10,          // black corner
