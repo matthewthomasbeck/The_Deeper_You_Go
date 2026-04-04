@@ -1,12 +1,17 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
 
 namespace Dungeon
 {
+    /// <summary>
+    /// Runs before typical <see cref="MonoBehaviour.Start"/> so initial layout wins over <see cref="DungeonStateMachine"/> calling <see cref="spawn_room"/> on the first frame.
+    /// </summary>
+    [DefaultExecutionOrder(-100)]
     public class DungeonGenerator : MonoBehaviour
     {
         [Header("Templates / Pools")]
@@ -24,18 +29,18 @@ namespace Dungeon
         public GameObject fallbackInteractablePrefab;
 
         [Header("Play mode")]
-        [Tooltip("Spawns the first room at (0,0) on Start so you do not need DungeonStateMachine in the scene. Disable if another system drives spawn_room.")]
+        [Tooltip("Spawns the initial layout in Awake (before other scripts' Start). Disable if another system owns first spawn.")]
         public bool spawnDungeonOnPlay = true;
 
-        [Tooltip("Difficulty passed to PickRoomTemplate for the first room when spawnDungeonOnPlay runs.")]
+        [Tooltip("Difficulty passed for the first room / hub when spawnDungeonOnPlay runs.")]
         public int spawnOnPlayDifficulty = 0;
 
-        [Tooltip("If true, after spawning the first room on Start, expands its exits (hallways + neighbors). If you use DungeonStateMachine.EnterRoom, leave true; EnterRoom also expands and skips if already done.")]
+        [Tooltip("If true, after the first room spawns on play, expands exits (hallways + neighbors) using simple edge-to-edge placement.")]
         public bool expandFirstRoomExitsOnPlay = true;
 
         [Header("Simple hub (debug)")]
-        [Tooltip("If true, on Start: RD-ThreeColumns at (0,0) plus exactly one hallway per door (4 hallways). No neighbor rooms and no expansion from hallways. Ignores expandFirstRoomExitsOnPlay.")]
-        public bool spawnHubThreeColumnsFourHallwaysOnly = false;
+        [Tooltip("If true, on play: RD-ThreeColumns at (0,0) plus one hallway per door (4 hallways). No neighbor rooms and no expansion from hallways. Ignores expandFirstRoomExitsOnPlay.")]
+        public bool spawnHubThreeColumnsFourHallwaysOnly = true;
 
         [Tooltip("Center room for hub mode. In Editor, left empty loads RD-ThreeColumns. Assign in builds.")]
         public RoomDefinition hubCenterRoomDefinition;
@@ -46,6 +51,7 @@ namespace Dungeon
         {
             TryBindHallwayAssetsIfMissing();
             TryBindHubCenterAssetIfMissing();
+            RunSpawnDungeonOnPlayIfNeeded();
         }
 
         /// <summary>
@@ -80,11 +86,11 @@ namespace Dungeon
 #endif
         }
 
-        private void Start()
+        /// <summary>
+        /// Runs in <see cref="Awake"/> so <see cref="DungeonStateMachine"/> cannot fill <see cref="roomMap"/> first and skip hub / on-play spawn.
+        /// </summary>
+        private void RunSpawnDungeonOnPlayIfNeeded()
         {
-            TryBindHallwayAssetsIfMissing();
-            TryBindHubCenterAssetIfMissing();
-
             if (!spawnDungeonOnPlay)
                 return;
 
@@ -145,8 +151,24 @@ namespace Dungeon
                 if (hallwayDef == null)
                     continue;
 
-                if (!TryComputeAdjacentOrigin(center.origin, centerDef, door, side, hallwayDef, out var hallwayOrigin))
-                    continue;
+                TilePos hallwayOrigin;
+                switch (side)
+                {
+                    case DoorSide.East:
+                        hallwayOrigin = new TilePos(center.origin.x + centerDef.widthTiles, center.origin.y);
+                        break;
+                    case DoorSide.West:
+                        hallwayOrigin = new TilePos(center.origin.x - hallwayDef.widthTiles, center.origin.y);
+                        break;
+                    case DoorSide.North:
+                        hallwayOrigin = new TilePos(center.origin.x, center.origin.y + centerDef.heightTiles);
+                        break;
+                    case DoorSide.South:
+                        hallwayOrigin = new TilePos(center.origin.x, center.origin.y - hallwayDef.heightTiles);
+                        break;
+                    default:
+                        continue;
+                }
 
                 if (roomMap.ContainsKey(hallwayOrigin))
                     continue;
@@ -220,15 +242,47 @@ namespace Dungeon
                 return false;
             }
 
-            if (!TryComputeAdjacentOrigin(parent.origin, parent.definition, door, side, hallwayDef, out var hallwayOrigin))
-                return false;
+            TilePos hallwayOrigin;
+            switch (side)
+            {
+                case DoorSide.East:
+                    hallwayOrigin = new TilePos(parent.origin.x + parent.definition.widthTiles, parent.origin.y);
+                    break;
+                case DoorSide.West:
+                    hallwayOrigin = new TilePos(parent.origin.x - hallwayDef.widthTiles, parent.origin.y);
+                    break;
+                case DoorSide.North:
+                    hallwayOrigin = new TilePos(parent.origin.x, parent.origin.y + parent.definition.heightTiles);
+                    break;
+                case DoorSide.South:
+                    hallwayOrigin = new TilePos(parent.origin.x, parent.origin.y - hallwayDef.heightTiles);
+                    break;
+                default:
+                    return false;
+            }
 
             var neighborTemplate = PickRoomTemplate(difficulty);
             if (neighborTemplate == null)
                 return false;
 
-            if (!TryComputeBeyondSegment(hallwayOrigin, hallwayDef, side, neighborTemplate, out var nextOrigin))
-                return false;
+            TilePos nextOrigin;
+            switch (side)
+            {
+                case DoorSide.East:
+                    nextOrigin = new TilePos(hallwayOrigin.x + hallwayDef.widthTiles, hallwayOrigin.y);
+                    break;
+                case DoorSide.West:
+                    nextOrigin = new TilePos(hallwayOrigin.x - neighborTemplate.widthTiles, hallwayOrigin.y);
+                    break;
+                case DoorSide.North:
+                    nextOrigin = new TilePos(hallwayOrigin.x, hallwayOrigin.y + hallwayDef.heightTiles);
+                    break;
+                case DoorSide.South:
+                    nextOrigin = new TilePos(hallwayOrigin.x, hallwayOrigin.y - neighborTemplate.heightTiles);
+                    break;
+                default:
+                    return false;
+            }
 
             if (roomMap.ContainsKey(nextOrigin))
                 return false;
@@ -293,8 +347,25 @@ namespace Dungeon
                     if (neighborTemplate == null)
                         continue;
 
-                    if (!TryComputeBeyondSegment(room.origin, room.definition, side, neighborTemplate, out var nextOrigin))
-                        continue;
+                    TilePos nextOrigin;
+                    switch (side)
+                    {
+                        case DoorSide.East:
+                            nextOrigin = new TilePos(room.origin.x + room.definition.widthTiles, room.origin.y);
+                            break;
+                        case DoorSide.West:
+                            nextOrigin = new TilePos(room.origin.x - neighborTemplate.widthTiles, room.origin.y);
+                            break;
+                        case DoorSide.North:
+                            nextOrigin = new TilePos(room.origin.x, room.origin.y + room.definition.heightTiles);
+                            break;
+                        case DoorSide.South:
+                            nextOrigin = new TilePos(room.origin.x, room.origin.y - neighborTemplate.heightTiles);
+                            break;
+                        default:
+                            continue;
+                    }
+
                     if (roomMap.ContainsKey(nextOrigin))
                         continue;
 
@@ -313,15 +384,47 @@ namespace Dungeon
                 if (hallwayDef == null)
                     continue;
 
-                if (!TryComputeAdjacentOrigin(room.origin, room.definition, door, side, hallwayDef, out var hallwayOrigin))
-                    continue;
+                TilePos hallwayOrigin;
+                switch (side)
+                {
+                    case DoorSide.East:
+                        hallwayOrigin = new TilePos(room.origin.x + room.definition.widthTiles, room.origin.y);
+                        break;
+                    case DoorSide.West:
+                        hallwayOrigin = new TilePos(room.origin.x - hallwayDef.widthTiles, room.origin.y);
+                        break;
+                    case DoorSide.North:
+                        hallwayOrigin = new TilePos(room.origin.x, room.origin.y + room.definition.heightTiles);
+                        break;
+                    case DoorSide.South:
+                        hallwayOrigin = new TilePos(room.origin.x, room.origin.y - hallwayDef.heightTiles);
+                        break;
+                    default:
+                        continue;
+                }
 
                 var neighborTemplate = PickRoomTemplate(neighborDifficulty);
                 if (neighborTemplate == null)
                     continue;
 
-                if (!TryComputeBeyondSegment(hallwayOrigin, hallwayDef, side, neighborTemplate, out var nextOrigin))
-                    continue;
+                TilePos nextOrigin;
+                switch (side)
+                {
+                    case DoorSide.East:
+                        nextOrigin = new TilePos(hallwayOrigin.x + hallwayDef.widthTiles, hallwayOrigin.y);
+                        break;
+                    case DoorSide.West:
+                        nextOrigin = new TilePos(hallwayOrigin.x - neighborTemplate.widthTiles, hallwayOrigin.y);
+                        break;
+                    case DoorSide.North:
+                        nextOrigin = new TilePos(hallwayOrigin.x, hallwayOrigin.y + hallwayDef.heightTiles);
+                        break;
+                    case DoorSide.South:
+                        nextOrigin = new TilePos(hallwayOrigin.x, hallwayOrigin.y - neighborTemplate.heightTiles);
+                        break;
+                    default:
+                        continue;
+                }
 
                 if (roomMap.ContainsKey(nextOrigin))
                     continue;
@@ -343,209 +446,6 @@ namespace Dungeon
         private RoomDefinition ResolveHallwayTemplate(DoorAxis axis)
         {
             return axis == DoorAxis.UpDown ? hallwayUpDown : hallwayLeftRight;
-        }
-
-        /// <summary>
-        /// Bottom-left cell of the door footprint in room-local tiles.
-        /// Up/down (N/S wall): <see cref="DoorDefinition.tilePos"/> is the horizontal center cell.
-        /// Left/right (E/W wall): designator is the top cell (highest y); strip extends downward.
-        /// </summary>
-        private static bool TryGetDoorStripMinLocal(RoomDefinition def, DoorDefinition door, out int minX, out int minY)
-        {
-            minX = minY = 0;
-            if (def == null)
-                return false;
-
-            int maxX = def.widthTiles - 1;
-            int maxY = def.heightTiles - 1;
-            int x = door.tilePos.x;
-            int y = door.tilePos.y;
-            int d = (int)door.size;
-            if (d < 1)
-                d = 1;
-
-            if (y == maxY)
-            {
-                minY = maxY;
-                minX = x - d / 2;
-                return minX >= 0 && minX + d - 1 <= maxX;
-            }
-
-            if (y == 0)
-            {
-                minY = 0;
-                minX = x - d / 2;
-                return minX >= 0 && minX + d - 1 <= maxX;
-            }
-
-            if (x == maxX)
-            {
-                minX = maxX;
-                minY = y - (d - 1);
-                return minY >= 0 && minY + d - 1 <= maxY;
-            }
-
-            if (x == 0)
-            {
-                minX = 0;
-                minY = y - (d - 1);
-                return minY >= 0 && minY + d - 1 <= maxY;
-            }
-
-            return false;
-        }
-
-        private static bool TryGetDoorStripMinLocalOnSide(RoomDefinition def, DoorSide side, out int minX, out int minY)
-        {
-            minX = minY = 0;
-            if (def?.doorDefinitions == null)
-                return false;
-
-            foreach (var door in def.doorDefinitions)
-            {
-                if (InferDoorSide(def, door) != side)
-                    continue;
-                if (TryGetDoorStripMinLocal(def, door, out minX, out minY))
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static DoorSide Opposite(DoorSide side)
-        {
-            switch (side)
-            {
-                case DoorSide.North: return DoorSide.South;
-                case DoorSide.South: return DoorSide.North;
-                case DoorSide.East: return DoorSide.West;
-                case DoorSide.West: return DoorSide.East;
-                default: return DoorSide.Unknown;
-            }
-        }
-
-        private static bool TryComputeAdjacentOrigin(
-            TilePos parentOrigin,
-            RoomDefinition parentDef,
-            DoorDefinition parentDoor,
-            DoorSide side,
-            RoomDefinition incomingSegment,
-            out TilePos origin)
-        {
-            origin = parentOrigin;
-
-            if (!TryGetDoorStripMinLocal(parentDef, parentDoor, out var pMinX, out var pMinY))
-                return TryComputeAdjacentOriginLegacy(parentOrigin, parentDef, side, incomingSegment, out origin);
-            if (!TryGetDoorStripMinLocalOnSide(incomingSegment, Opposite(side), out var hMinX, out var hMinY))
-                return TryComputeAdjacentOriginLegacy(parentOrigin, parentDef, side, incomingSegment, out origin);
-
-            int pWy = parentOrigin.y + pMinY;
-
-            switch (side)
-            {
-                case DoorSide.East:
-                    origin = new TilePos(parentOrigin.x + parentDef.widthTiles, pWy - hMinY);
-                    return true;
-                case DoorSide.West:
-                    origin = new TilePos(parentOrigin.x - incomingSegment.widthTiles, pWy - hMinY);
-                    return true;
-                case DoorSide.North:
-                    origin = new TilePos(parentOrigin.x + pMinX - hMinX, parentOrigin.y + parentDef.heightTiles);
-                    return true;
-                case DoorSide.South:
-                    origin = new TilePos(parentOrigin.x + pMinX - hMinX, parentOrigin.y - incomingSegment.heightTiles);
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool TryComputeAdjacentOriginLegacy(
-            TilePos parentOrigin,
-            RoomDefinition parentDef,
-            DoorSide side,
-            RoomDefinition incomingSegment,
-            out TilePos origin)
-        {
-            origin = parentOrigin;
-            switch (side)
-            {
-                case DoorSide.East:
-                    origin = new TilePos(parentOrigin.x + parentDef.widthTiles, parentOrigin.y);
-                    return true;
-                case DoorSide.West:
-                    origin = new TilePos(parentOrigin.x - incomingSegment.widthTiles, parentOrigin.y);
-                    return true;
-                case DoorSide.North:
-                    origin = new TilePos(parentOrigin.x, parentOrigin.y + parentDef.heightTiles);
-                    return true;
-                case DoorSide.South:
-                    origin = new TilePos(parentOrigin.x, parentOrigin.y - incomingSegment.heightTiles);
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool TryComputeBeyondSegment(
-            TilePos segmentOrigin,
-            RoomDefinition segmentDef,
-            DoorSide outwardSide,
-            RoomDefinition followingRoom,
-            out TilePos nextOrigin)
-        {
-            nextOrigin = segmentOrigin;
-
-            DoorSide neighborFacing = Opposite(outwardSide);
-            if (!TryGetDoorStripMinLocalOnSide(segmentDef, outwardSide, out var sMinX, out var sMinY))
-                return TryComputeBeyondSegmentLegacy(segmentOrigin, segmentDef, outwardSide, followingRoom, out nextOrigin);
-            if (!TryGetDoorStripMinLocalOnSide(followingRoom, neighborFacing, out var nMinX, out var nMinY))
-                return TryComputeBeyondSegmentLegacy(segmentOrigin, segmentDef, outwardSide, followingRoom, out nextOrigin);
-
-            switch (outwardSide)
-            {
-                case DoorSide.East:
-                    nextOrigin = new TilePos(segmentOrigin.x + segmentDef.widthTiles, segmentOrigin.y + sMinY - nMinY);
-                    return true;
-                case DoorSide.West:
-                    nextOrigin = new TilePos(segmentOrigin.x - followingRoom.widthTiles, segmentOrigin.y + sMinY - nMinY);
-                    return true;
-                case DoorSide.North:
-                    nextOrigin = new TilePos(segmentOrigin.x + sMinX - nMinX, segmentOrigin.y + segmentDef.heightTiles);
-                    return true;
-                case DoorSide.South:
-                    nextOrigin = new TilePos(segmentOrigin.x + sMinX - nMinX, segmentOrigin.y - followingRoom.heightTiles);
-                    return true;
-                default:
-                    return false;
-            }
-        }
-
-        private static bool TryComputeBeyondSegmentLegacy(
-            TilePos segmentOrigin,
-            RoomDefinition segmentDef,
-            DoorSide outwardSide,
-            RoomDefinition followingRoom,
-            out TilePos nextOrigin)
-        {
-            nextOrigin = segmentOrigin;
-            switch (outwardSide)
-            {
-                case DoorSide.East:
-                    nextOrigin = new TilePos(segmentOrigin.x + segmentDef.widthTiles, segmentOrigin.y);
-                    return true;
-                case DoorSide.West:
-                    nextOrigin = new TilePos(segmentOrigin.x - followingRoom.widthTiles, segmentOrigin.y);
-                    return true;
-                case DoorSide.North:
-                    nextOrigin = new TilePos(segmentOrigin.x, segmentOrigin.y + segmentDef.heightTiles);
-                    return true;
-                case DoorSide.South:
-                    nextOrigin = new TilePos(segmentOrigin.x, segmentOrigin.y - followingRoom.heightTiles);
-                    return true;
-                default:
-                    return false;
-            }
         }
 
         private static DoorSide InferDoorSide(RoomDefinition roomDefinition, DoorDefinition door)
@@ -582,6 +482,49 @@ namespace Dungeon
             return candidates[UnityEngine.Random.Range(0, candidates.Count)];
         }
 
+        /// <summary>
+        /// Moves all Tilemaps under this instance so the bottom-left of painted cells matches
+        /// <see cref="RoomDefinition"/> logical (0,0) at the room's world origin. Fixes prefabs
+        /// whose tiles were painted with negative cell indices without editing YAML by hand.
+        /// </summary>
+        private static void AlignSpawnedTilemapsToLogicalOrigin(GameObject root)
+        {
+            if (root == null)
+                return;
+
+            var grid = root.GetComponentInChildren<Grid>(true);
+            if (grid == null)
+                return;
+
+            var tilemaps = root.GetComponentsInChildren<Tilemap>(true);
+            if (tilemaps == null || tilemaps.Length == 0)
+                return;
+
+            var gx = int.MaxValue;
+            var gy = int.MaxValue;
+            foreach (var tm in tilemaps)
+            {
+                if (tm == null)
+                    continue;
+                var b = tm.cellBounds;
+                if (b.size.x <= 0 || b.size.y <= 0)
+                    continue;
+                gx = Mathf.Min(gx, b.xMin);
+                gy = Mathf.Min(gy, b.yMin);
+            }
+
+            if (gx == int.MaxValue || (gx == 0 && gy == 0))
+                return;
+
+            var cs = grid.cellSize;
+            var delta = new Vector3(-gx * cs.x, -gy * cs.y, 0f);
+            foreach (var tm in tilemaps)
+            {
+                if (tm != null)
+                    tm.transform.localPosition += delta;
+            }
+        }
+
         private void SpawnRoomLogicalContent(RoomInstance room)
         {
             if (room.definition == null)
@@ -592,6 +535,7 @@ namespace Dungeon
                 var worldPos = new Vector3(room.origin.x, room.origin.y, 0f);
                 var instance = Instantiate(room.definition.roomPrefab, worldPos, Quaternion.identity);
                 room.prefabInstance = instance;
+                AlignSpawnedTilemapsToLogicalOrigin(instance);
             }
 
             foreach (var placement in room.definition.interactablePlacements)
