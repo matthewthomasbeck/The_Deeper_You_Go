@@ -21,6 +21,15 @@ MonoBehaviour:
   wallBottom: {fileID: 11400000, guid: 8e8543481fae442ccb2957f83e5d1665, type: 2}
   wallLeft: {fileID: 11400000, guid: 67aa4ed2589d6431496f905864eeee0a, type: 2}
   wallRight: {fileID: 11400000, guid: ab91a94ecaadc47a0b45b8d5b3a0cb33, type: 2}
+  rugTopLeft: {fileID: 11400000, guid: 57b35628e4b3c4901969d02a8718ab67, type: 2}
+  rugTop: {fileID: 11400000, guid: bf19bf27238154af69346dddc8d51da2, type: 2}
+  rugTopRight: {fileID: 11400000, guid: e9d24871862734f13aa131d9770dd72d, type: 2}
+  rugMidLeft: {fileID: 11400000, guid: f2e462791a0ac435f8bcafc51e766956, type: 2}
+  rugCenter: {fileID: 11400000, guid: 23bcb1375cdd1447e8a102e98f215cc1, type: 2}
+  rugMidRight: {fileID: 11400000, guid: de6b13a76ae394db3801cedd887a999e, type: 2}
+  rugBottomLeft: {fileID: 11400000, guid: 4b8be5b662c374e8a904ad65db325ea7, type: 2}
+  rugBottom: {fileID: 11400000, guid: 1775eabfceb7742948a36ef1c4328332, type: 2}
+  rugBottomRight: {fileID: 11400000, guid: 2ac2fbef0511a4fd79bbaba32be17237, type: 2}
   hallwayBreachWestLower: {fileID: 11400000, guid: cb21565c8b66b47639489f3907a2f052, type: 2}
   hallwayBreachWestUpperCap: {fileID: 11400000, guid: d77ef7b2e55d6489884c6f6750dffb1e, type: 2}
   hallwayBreachEastLower: {fileID: 11400000, guid: 90903cee5d2f04201b7904b726bd6c52, type: 2}

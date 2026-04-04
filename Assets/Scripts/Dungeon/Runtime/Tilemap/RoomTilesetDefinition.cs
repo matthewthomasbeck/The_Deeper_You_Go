@@ -26,6 +26,26 @@ namespace Dungeon
         public TileBase wallLeft;
         public TileBase wallRight;
 
+        [Header("Large room rug 9-slice (rooms_14–20 layout)")]
+        [Tooltip("North-west / top-left corner (e.g. rooms_14).")]
+        public TileBase rugTopLeft;
+        [Tooltip("North edge, not corner (e.g. rooms_17).")]
+        public TileBase rugTop;
+        [Tooltip("North-east / top-right (e.g. rooms_15).")]
+        public TileBase rugTopRight;
+        [Tooltip("West edge, not corner (e.g. rooms_18).")]
+        public TileBase rugMidLeft;
+        [Tooltip("Interior (e.g. rooms_20).")]
+        public TileBase rugCenter;
+        [Tooltip("East edge, not corner (e.g. rooms_19).")]
+        public TileBase rugMidRight;
+        [Tooltip("South-west / bottom-left (e.g. rooms_12).")]
+        public TileBase rugBottomLeft;
+        [Tooltip("South edge, not corner (e.g. rooms_16).")]
+        public TileBase rugBottom;
+        [Tooltip("South-east / bottom-right (e.g. rooms_13).")]
+        public TileBase rugBottomRight;
+
         [Header("Hallway ↔ room breach trim (uses wallTop / rooms_0 for row above hallway)")]
         [Tooltip("West breach: cell below hallway segment (e.g. rooms_2).")]
         public TileBase hallwayBreachWestLower;

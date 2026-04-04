@@ -121,6 +121,7 @@ namespace Dungeon
 
             BspTilemapPainter.Paint(tilemap, originCell, tileset, floorGrid);
             BspTilemapPainter.CleanUpRooms(tilemap, originCell, tileset, floorGrid);
+            RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid);
 
             FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 

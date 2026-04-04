@@ -33,8 +33,8 @@ namespace Dungeon
             }
         }
 
-        [Tooltip("Stop splitting when a region is smaller than this (width or height). Larger = bigger BSP regions = more empty space between rooms.")]
-        [Min(4)] public int minLeafSize = 96;
+        [Tooltip("Minimum child width/height after a split. Lower ⇒ more leaves & more rooms on big maps (try 14–18). Too high ⇒ huge void with few rooms.")]
+        [Min(4)] public int minLeafSize = 16;
 
         [Tooltip("Minimum carved room width/height (forced odd, at least 13).")]
         [Range(13, 35)] public int minRoomSize = 13;
@@ -42,15 +42,23 @@ namespace Dungeon
         [Tooltip("Maximum carved room width/height (forced odd, at most 35).")]
         [Range(13, 35)] public int maxRoomSize = 35;
 
-        [Tooltip("Minimum cells between each leaf edge and the carved room (larger = rooms sit farther from neighbors).")]
-        [Min(0)] public int roomPadding = 18;
+        [Tooltip("Inset from leaf border when placing a room; keep small so rooms sit nearer BSP region edges.")]
+        [Min(0)] public int roomPadding = 2;
 
-        [Tooltip("0 = room can use full inner leaf; higher = bias placement toward leaf center (more void toward sibling regions).")]
+        [Tooltip("0 = uniform random position in leaf; higher = push room toward leaf center (adds gap toward neighbors).")]
         [Range(0f, 0.95f)]
-        public float roomPlacementCenterBias = 0.42f;
+        public float roomPlacementCenterBias = 0f;
+
+        [Tooltip("0 = random split position; 1 = always midpoint. Midpoint reduces long skinny leaves that cannot fit a room (empty void strips).")]
+        [Range(0f, 1f)]
+        public float splitMidpointBias = 0.45f;
+
+        [Tooltip("Per axis: probability the room uses the largest odd size that still fits the leaf (fills space, less black padding inside each region).")]
+        [Range(0f, 1f)]
+        public float roomFillLeafBias = 0.55f;
 
         [Tooltip("Maximum split depth (safety cap). Raise for very large maps if leaves stop subdividing too early.")]
-        [Range(1, 32)] public int maxDepth = 20;
+        [Range(1, 32)] public int maxDepth = 28;
 
         [Tooltip("If true, prefer splitting the longer axis; otherwise random.")]
         public bool splitLongerAxisFirst = true;

@@ -498,12 +498,14 @@ MonoBehaviour:
     enforceMinimumDungeonFootprint: 1
     minimumDungeonWidth: 640
     minimumDungeonHeight: 480
-    minLeafSize: 96
+    minLeafSize: 16
     minRoomSize: 13
     maxRoomSize: 35
-    roomPadding: 18
-    roomPlacementCenterBias: 0.42
-    maxDepth: 20
+    roomPadding: 2
+    roomPlacementCenterBias: 0
+    splitMidpointBias: 0.45
+    roomFillLeafBias: 0.55
+    maxDepth: 28
     splitLongerAxisFirst: 1
   useFixedSeed: 0
   fixedSeed: 12345

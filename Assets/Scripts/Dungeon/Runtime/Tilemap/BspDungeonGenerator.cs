@@ -81,7 +81,7 @@ namespace Dungeon
                     return;
                 }
 
-                int splitY = UnityEngine.Random.Range(minY, maxY + 1);
+                int splitY = PickSplitCoordinate(minY, maxY, p.splitMidpointBias);
                 n.Left = new Node { X = n.X, Y = n.Y, W = n.W, H = splitY - n.Y };
                 n.Right = new Node { X = n.X, Y = splitY, W = n.W, H = n.Y + n.H - splitY };
             }
@@ -96,7 +96,7 @@ namespace Dungeon
                     return;
                 }
 
-                int splitX = UnityEngine.Random.Range(minX, maxX + 1);
+                int splitX = PickSplitCoordinate(minX, maxX, p.splitMidpointBias);
                 n.Left = new Node { X = n.X, Y = n.Y, W = splitX - n.X, H = n.H };
                 n.Right = new Node { X = splitX, Y = n.Y, W = n.X + n.W - splitX, H = n.H };
             }
@@ -126,10 +126,16 @@ namespace Dungeon
                     return;
                 }
 
-                int maxRw = OddDown(innerW);
-                int maxRh = OddDown(innerH);
-                int rw = RandomOddInclusive(minOdd, maxRw);
-                int rh = RandomOddInclusive(minOdd, maxRh);
+                int maxRw = OddDown(Mathf.Min(innerW, maxOdd));
+                int maxRh = OddDown(Mathf.Min(innerH, maxOdd));
+                if (maxRw < minOdd || maxRh < minOdd)
+                {
+                    n.HasRoom = false;
+                    return;
+                }
+
+                int rw = PickRoomSpan(minOdd, maxRw, p.roomFillLeafBias);
+                int rh = PickRoomSpan(minOdd, maxRh, p.roomFillLeafBias);
 
                 int spanX = innerW - rw;
                 int spanY = innerH - rh;
@@ -165,6 +171,27 @@ namespace Dungeon
                 return minOdd;
             int steps = (maxOdd - minOdd) / 2 + 1;
             return minOdd + 2 * UnityEngine.Random.Range(0, steps);
+        }
+
+        private static int PickSplitCoordinate(int minInclusive, int maxInclusive, float midpointBias)
+        {
+            if (maxInclusive <= minInclusive)
+                return minInclusive;
+
+            int randomPick = UnityEngine.Random.Range(minInclusive, maxInclusive + 1);
+            int mid = (minInclusive + maxInclusive) / 2;
+            float b = Mathf.Clamp01(midpointBias);
+            int blended = Mathf.RoundToInt(Mathf.Lerp(randomPick, mid, b));
+            return Mathf.Clamp(blended, minInclusive, maxInclusive);
+        }
+
+        private static int PickRoomSpan(int minOdd, int maxOdd, float fillLeafBias)
+        {
+            if (maxOdd <= minOdd)
+                return minOdd;
+            if (fillLeafBias > 0f && UnityEngine.Random.value < Mathf.Clamp01(fillLeafBias))
+                return maxOdd;
+            return RandomOddInclusive(minOdd, maxOdd);
         }
 
         /// <summary>
