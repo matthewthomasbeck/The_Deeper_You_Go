@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace Dungeon
 {
@@ -10,48 +13,156 @@ namespace Dungeon
         public List<RoomDefinition> roomTemplates = new List<RoomDefinition>();
         public List<NpcDefinition> npcTemplates = new List<NpcDefinition>();
 
+        [Header("Hallways (between regular rooms)")]
+        [Tooltip("DoorAxis.LeftRight → this hallway (e.g. east/west connection).")]
+        public RoomDefinition hallwayLeftRight;
+        [Tooltip("DoorAxis.UpDown → this hallway (e.g. north/south connection).")]
+        public RoomDefinition hallwayUpDown;
+
         [Header("Optional: fallback prefabs if definitions have none")]
         public GameObject fallbackNpcPrefab;
         public GameObject fallbackInteractablePrefab;
 
-        // important: tracks spawned rooms by origin coordinate
+        [Header("Play mode")]
+        [Tooltip("Spawns the first room at (0,0) on Start so you do not need DungeonStateMachine in the scene. Disable if another system drives spawn_room.")]
+        public bool spawnDungeonOnPlay = true;
+
+        [Tooltip("Difficulty passed to PickRoomTemplate for the first room when spawnDungeonOnPlay runs.")]
+        public int spawnOnPlayDifficulty = 0;
+
+        [Tooltip("If true, after spawning the first room on Start, expands its exits (hallways + neighbors). If you use DungeonStateMachine.EnterRoom, leave true; EnterRoom also expands and skips if already done.")]
+        public bool expandFirstRoomExitsOnPlay = true;
+
         private readonly Dictionary<TilePos, RoomInstance> roomMap = new Dictionary<TilePos, RoomInstance>();
 
+        private void Awake()
+        {
+            TryBindHallwayAssetsIfMissing();
+        }
 
+        /// <summary>
+        /// Scene references to hallway RoomDefinitions sometimes deserialize as null (broken import, script compile errors, iCloud merge).
+        /// In the editor, reload them from known paths before Start runs.
+        /// </summary>
+        private void TryBindHallwayAssetsIfMissing()
+        {
+#if UNITY_EDITOR
+            if (hallwayLeftRight == null)
+            {
+                hallwayLeftRight = AssetDatabase.LoadAssetAtPath<RoomDefinition>(
+                    "Assets/Dungeons/RoomDefinitions/RD-HallwayThree-LR.asset");
+            }
 
-/********** ROOM GENERATION **********/
+            if (hallwayUpDown == null)
+            {
+                hallwayUpDown = AssetDatabase.LoadAssetAtPath<RoomDefinition>(
+                    "Assets/Dungeons/RoomDefinitions/RD-HallwayThree-UD.asset");
+            }
+#endif
+        }
 
-/***** spawn a room adjacent to a parent room *****/
+        private void Start()
+        {
+            TryBindHallwayAssetsIfMissing();
+
+            if (!spawnDungeonOnPlay)
+                return;
+
+            if (roomMap.Count > 0)
+                return;
+
+            var first = spawn_room(null, spawnOnPlayDifficulty);
+            if (expandFirstRoomExitsOnPlay && first != null)
+                ExpandExitsForRoom(first, spawnOnPlayDifficulty + 1);
+        }
+
+        /// <summary>
+        /// Spawns hallways and neighbor rooms for every door of this room, once.
+        /// Call when the room becomes visible or the player enters it — not during <see cref="GetOrCreateRoom"/>.
+        /// </summary>
+        public void ExpandExitsForRoom(RoomInstance room, int neighborDifficulty)
+        {
+            if (room == null || room.definition == null || room.exitsExpanded)
+                return;
+
+            room.exitsExpanded = true;
+            ExpandDoorsForRoomOnce(room, neighborDifficulty);
+        }
 
         public RoomInstance spawn_room(RoomInstance parent_room, int difficulty)
         {
             if (parent_room == null)
             {
-                // important: startup spawns first room
-                return GetOrCreateRoom(new TilePos(0, 0), PickRoomTemplate(difficulty), difficulty, expandNeighborsOnce: true);
+                var firstTemplate = PickRoomTemplate(difficulty);
+                if (firstTemplate == null)
+                {
+                    Debug.LogError(
+                        "DungeonGenerator: cannot spawn first room — PickRoomTemplate returned null. " +
+                        "Add at least one RoomDefinition with isHallway unchecked to roomTemplates, and ensure min/max difficulty includes your starting difficulty.");
+                    return null;
+                }
+
+                return GetOrCreateRoom(new TilePos(0, 0), firstTemplate, difficulty);
             }
 
-            // important: expand from parent room doors
             foreach (var door in parent_room.definition.doorDefinitions)
             {
-                var neighborOrigin = ComputeNeighborOrigin(parent_room, door.direction);
-                var neighborTemplate = PickRoomTemplate(difficulty);
-
-                if (roomMap.ContainsKey(neighborOrigin))
-                    continue;
-
-                return GetOrCreateRoom(neighborOrigin, neighborTemplate, difficulty, expandNeighborsOnce: true);
+                if (TrySpawnThroughHallway(parent_room, door, difficulty, out var nextRoom))
+                    return nextRoom;
             }
 
-            // important: fallback spawn if no doors exist
             var fallbackOrigin = new TilePos(parent_room.origin.x + 1, parent_room.origin.y);
-            return GetOrCreateRoom(fallbackOrigin, PickRoomTemplate(difficulty), difficulty, expandNeighborsOnce: true);
+            Debug.LogWarning("spawn_room: no valid door/hallway chain; using direct neighbor fallback.");
+            return GetOrCreateRoom(fallbackOrigin, PickRoomTemplate(difficulty), difficulty);
         }
 
+        private bool TrySpawnThroughHallway(RoomInstance parent, DoorDefinition door, int difficulty, out RoomInstance result)
+        {
+            result = null;
+            if (parent?.definition == null)
+                return false;
 
-/***** get existing room or create a new room instance *****/
+            var side = InferDoorSide(parent.definition, door);
+            if (side == DoorSide.Unknown)
+            {
+                Debug.LogWarning($"Door tile {door.tilePos} is not on room border for room '{parent.definition.roomId}'.");
+                return false;
+            }
 
-        private RoomInstance GetOrCreateRoom(TilePos origin, RoomDefinition template, int difficulty, bool expandNeighborsOnce)
+            var hallwayDef = ResolveHallwayTemplate(door.axis);
+            if (hallwayDef == null)
+            {
+                Debug.LogWarning($"No hallway assigned for DoorAxis.{door.axis} on DungeonGenerator.");
+                return false;
+            }
+
+            if (!TryComputeAdjacentOrigin(parent.origin, parent.definition, side, hallwayDef, out var hallwayOrigin))
+                return false;
+
+            var neighborTemplate = PickRoomTemplate(difficulty);
+            if (neighborTemplate == null)
+                return false;
+
+            if (!TryComputeBeyondSegment(hallwayOrigin, hallwayDef, side, neighborTemplate, out var nextOrigin))
+                return false;
+
+            if (roomMap.ContainsKey(nextOrigin))
+                return false;
+
+            if (roomMap.TryGetValue(hallwayOrigin, out var existingHallway))
+            {
+                if (existingHallway.definition != hallwayDef || !existingHallway.definition.isHallway)
+                    return false;
+                result = GetOrCreateRoom(nextOrigin, neighborTemplate, difficulty);
+                return true;
+            }
+
+            GetOrCreateRoom(hallwayOrigin, hallwayDef, difficulty);
+            result = GetOrCreateRoom(nextOrigin, neighborTemplate, difficulty);
+            return true;
+        }
+
+        private RoomInstance GetOrCreateRoom(TilePos origin, RoomDefinition template, int difficulty)
         {
             if (roomMap.TryGetValue(origin, out var existing))
                 return existing;
@@ -67,81 +178,172 @@ namespace Dungeon
 
             SpawnRoomLogicalContent(room);
 
-            if (expandNeighborsOnce && template != null)
-                ExpandDoorsForRoomOnce(room, difficulty + 1);
-
             return room;
         }
 
-
-/***** expand doors into neighbor rooms once *****/
-
         private void ExpandDoorsForRoomOnce(RoomInstance room, int neighborDifficulty)
         {
-            // important: entering a room spawns adjacent rooms for its doors
+            if (room?.definition == null)
+                return;
+
+            if (!room.definition.isHallway && hallwayLeftRight == null && hallwayUpDown == null)
+            {
+                Debug.LogError(
+                    "DungeonGenerator: hallwayLeftRight / hallwayUpDown are still null after auto-bind. " +
+                    "1) Fix all Console compile errors (any 'Unknown' script on RoomDefinition assets usually means scripts did not compile). " +
+                    "2) On DungeonGenerator, assign Hallway Left Right → RD-HallwayThree-LR and Hallway Up Down → RD-HallwayThree-UD. " +
+                    "3) In a build, wire these in the scene (editor auto-bind only runs in the Editor).",
+                    this);
+                return;
+            }
+
+            if (room.definition.isHallway)
+            {
+                foreach (var door in room.definition.doorDefinitions)
+                {
+                    var side = InferDoorSide(room.definition, door);
+                    if (side == DoorSide.Unknown)
+                        continue;
+
+                    var neighborTemplate = PickRoomTemplate(neighborDifficulty);
+                    if (neighborTemplate == null)
+                        continue;
+
+                    if (!TryComputeBeyondSegment(room.origin, room.definition, side, neighborTemplate, out var nextOrigin))
+                        continue;
+                    if (roomMap.ContainsKey(nextOrigin))
+                        continue;
+
+                    GetOrCreateRoom(nextOrigin, neighborTemplate, neighborDifficulty);
+                }
+                return;
+            }
+
             foreach (var door in room.definition.doorDefinitions)
             {
-                var neighborOrigin = ComputeNeighborOrigin(room, door.direction);
-                if (roomMap.ContainsKey(neighborOrigin))
+                var side = InferDoorSide(room.definition, door);
+                if (side == DoorSide.Unknown)
+                    continue;
+
+                var hallwayDef = ResolveHallwayTemplate(door.axis);
+                if (hallwayDef == null)
+                    continue;
+
+                if (!TryComputeAdjacentOrigin(room.origin, room.definition, side, hallwayDef, out var hallwayOrigin))
                     continue;
 
                 var neighborTemplate = PickRoomTemplate(neighborDifficulty);
-                GetOrCreateRoom(neighborOrigin, neighborTemplate, neighborDifficulty, expandNeighborsOnce: false);
+                if (neighborTemplate == null)
+                    continue;
+
+                if (!TryComputeBeyondSegment(hallwayOrigin, hallwayDef, side, neighborTemplate, out var nextOrigin))
+                    continue;
+
+                if (roomMap.ContainsKey(nextOrigin))
+                    continue;
+
+                if (roomMap.ContainsKey(hallwayOrigin))
+                {
+                    if (!roomMap.TryGetValue(hallwayOrigin, out var h) || h.definition != hallwayDef || !h.definition.isHallway)
+                        continue;
+                    GetOrCreateRoom(nextOrigin, neighborTemplate, neighborDifficulty);
+                }
+                else
+                {
+                    GetOrCreateRoom(hallwayOrigin, hallwayDef, neighborDifficulty);
+                    GetOrCreateRoom(nextOrigin, neighborTemplate, neighborDifficulty);
+                }
             }
         }
 
-
-/***** compute origin for a neighboring room *****/
-
-        private TilePos ComputeNeighborOrigin(RoomInstance parent, DoorDirection direction)
+        private RoomDefinition ResolveHallwayTemplate(DoorAxis axis)
         {
-            int dx = 0;
-            int dy = 0;
-            switch (direction)
-            {
-                case DoorDirection.East:
-                    dx = parent.definition.widthTiles;
-                    break;
-                case DoorDirection.West:
-                    dx = -parent.definition.widthTiles;
-                    break;
-                case DoorDirection.North:
-                    dy = parent.definition.heightTiles;
-                    break;
-                case DoorDirection.South:
-                    dy = -parent.definition.heightTiles;
-                    break;
-            }
-            return new TilePos(parent.origin.x + dx, parent.origin.y + dy);
+            return axis == DoorAxis.UpDown ? hallwayUpDown : hallwayLeftRight;
         }
 
+        private static bool TryComputeAdjacentOrigin(TilePos parentOrigin, RoomDefinition parentDef, DoorSide side, RoomDefinition incomingSegment, out TilePos origin)
+        {
+            origin = parentOrigin;
+            switch (side)
+            {
+                case DoorSide.East:
+                    origin = new TilePos(parentOrigin.x + parentDef.widthTiles, parentOrigin.y);
+                    return true;
+                case DoorSide.West:
+                    origin = new TilePos(parentOrigin.x - incomingSegment.widthTiles, parentOrigin.y);
+                    return true;
+                case DoorSide.North:
+                    origin = new TilePos(parentOrigin.x, parentOrigin.y + parentDef.heightTiles);
+                    return true;
+                case DoorSide.South:
+                    origin = new TilePos(parentOrigin.x, parentOrigin.y - incomingSegment.heightTiles);
+                    return true;
+                default:
+                    return false;
+            }
+        }
 
-/***** pick a room template for a difficulty value *****/
+        private static bool TryComputeBeyondSegment(TilePos segmentOrigin, RoomDefinition segmentDef, DoorSide outwardSide, RoomDefinition followingRoom, out TilePos nextOrigin)
+        {
+            nextOrigin = segmentOrigin;
+            switch (outwardSide)
+            {
+                case DoorSide.East:
+                    nextOrigin = new TilePos(segmentOrigin.x + segmentDef.widthTiles, segmentOrigin.y);
+                    return true;
+                case DoorSide.West:
+                    nextOrigin = new TilePos(segmentOrigin.x - followingRoom.widthTiles, segmentOrigin.y);
+                    return true;
+                case DoorSide.North:
+                    nextOrigin = new TilePos(segmentOrigin.x, segmentOrigin.y + segmentDef.heightTiles);
+                    return true;
+                case DoorSide.South:
+                    nextOrigin = new TilePos(segmentOrigin.x, segmentOrigin.y - followingRoom.heightTiles);
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private DoorSide InferDoorSide(RoomDefinition roomDefinition, DoorDefinition door)
+        {
+            int x = door.tilePos.x;
+            int y = door.tilePos.y;
+            int maxX = roomDefinition.widthTiles - 1;
+            int maxY = roomDefinition.heightTiles - 1;
+
+            if (y == maxY) return DoorSide.North;
+            if (y == 0) return DoorSide.South;
+            if (x == maxX) return DoorSide.East;
+            if (x == 0) return DoorSide.West;
+
+            return DoorSide.Unknown;
+        }
 
         private RoomDefinition PickRoomTemplate(int difficulty)
         {
             if (roomTemplates == null || roomTemplates.Count == 0)
                 return null;
 
-            // important: filter by difficulty range
             var candidates = roomTemplates.FindAll(r =>
-                r != null && difficulty >= r.minDifficultyInclusive && difficulty <= r.maxDifficultyInclusive);
+                r != null && !r.isHallway && difficulty >= r.minDifficultyInclusive && difficulty <= r.maxDifficultyInclusive);
 
             if (candidates == null || candidates.Count == 0)
-                return roomTemplates[UnityEngine.Random.Range(0, roomTemplates.Count)];
+            {
+                var any = roomTemplates.FindAll(r => r != null && !r.isHallway);
+                if (any == null || any.Count == 0)
+                    return null;
+                return any[UnityEngine.Random.Range(0, any.Count)];
+            }
 
             return candidates[UnityEngine.Random.Range(0, candidates.Count)];
         }
-
-
-/***** spawn logical content inside a room *****/
 
         private void SpawnRoomLogicalContent(RoomInstance room)
         {
             if (room.definition == null)
                 return;
 
-            // important: instantiate room prefab for visuals
             if (room.definition.roomPrefab != null)
             {
                 var worldPos = new Vector3(room.origin.x, room.origin.y, 0f);
@@ -149,7 +351,6 @@ namespace Dungeon
                 room.prefabInstance = instance;
             }
 
-            // important: interactables are placed at room creation
             foreach (var placement in room.definition.interactablePlacements)
             {
                 if (placement.interactable == null)
@@ -161,9 +362,6 @@ namespace Dungeon
                     room.interactables.Add(go);
             }
         }
-
-
-/***** instantiate an interactable for a room *****/
 
         private InteractableBase CreateInteractable(InteractableDefinition definition, TilePos worldTile)
         {
@@ -190,18 +388,11 @@ namespace Dungeon
             return interactable;
         }
 
-
-
-/********** NPC SPAWNING **********/
-
-/***** spawn room npcs on first visit *****/
-
         public void spawn_npc(int difficulty, RoomInstance room)
         {
             if (room == null || room.definition == null)
                 return;
 
-            // important: spawn once per room visit
             if (room.npcs.Count > 0)
                 return;
 
@@ -213,9 +404,6 @@ namespace Dungeon
                     room.npcs.Add(npc);
             }
         }
-
-
-/***** spawn additional npcs for events *****/
 
         public void spawn_npc_more(int difficulty, RoomInstance room, int count, List<NpcDefinition> npcPoolOverride = null)
         {
@@ -236,7 +424,6 @@ namespace Dungeon
             if (pool == null || pool.Count == 0)
                 return;
 
-            // important: try to spawn on unused spawn points
             for (int i = 0; i < count; i++)
             {
                 if (i >= room.definition.npcSpawnPoints.Count)
@@ -250,7 +437,6 @@ namespace Dungeon
                     continue;
                 }
 
-                // important: spawn using a pool override
                 var template = pool[UnityEngine.Random.Range(0, pool.Count)];
                 if (template == null)
                     continue;
@@ -264,9 +450,6 @@ namespace Dungeon
             }
         }
 
-
-/***** create npc using default template pool *****/
-
         private ActorBase CreateNpc(TilePos worldTile, int difficulty)
         {
             if (npcTemplates == null || npcTemplates.Count == 0)
@@ -275,7 +458,6 @@ namespace Dungeon
                 return null;
             }
 
-            // important: pick random npc template and scale stats by difficulty
             var template = npcTemplates[UnityEngine.Random.Range(0, npcTemplates.Count)];
             if (template == null)
                 return null;
@@ -294,7 +476,6 @@ namespace Dungeon
 
             actor.tilePosition = worldTile;
 
-            // important: simple stat scaling for endless difficulty
             float scale = 1f + (difficulty * 0.1f);
 
             if (actor.inventory == null)
@@ -307,9 +488,6 @@ namespace Dungeon
 
             return actor;
         }
-
-
-/***** create npc using an explicit template *****/
 
         private ActorBase CreateNpcFromTemplate(TilePos worldTile, int difficulty, NpcDefinition template)
         {
@@ -342,6 +520,14 @@ namespace Dungeon
 
             return actor;
         }
+
+        private enum DoorSide
+        {
+            Unknown,
+            North,
+            South,
+            East,
+            West,
+        }
     }
 }
-

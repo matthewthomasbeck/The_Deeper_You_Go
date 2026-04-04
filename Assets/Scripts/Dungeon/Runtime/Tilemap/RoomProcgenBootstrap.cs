@@ -19,12 +19,7 @@ namespace Dungeon
 
         private void Start()
         {
-            if (roomRenderer == null)
-                return;
-
-            var grid = ProceduralRoomBuilder.BuildBasicRoom(widthTiles, heightTiles, interior);
-            roomRenderer.Clear();
-            roomRenderer.Render(grid);
+            // Procedural tile painting removed — use RoomDefinition.roomPrefab + DungeonGenerator instead.
         }
     }
 }

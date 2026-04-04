@@ -51,7 +51,7 @@ namespace Dungeon
 
         public void state_machine()
         {
-            if (hero == null || generator == null || eventSystem == null)
+            if (generator == null)
                 return;
 
             if (!initialized)
@@ -69,6 +69,9 @@ namespace Dungeon
                 difficultyTimer = 0f;
                 difficulty++;
             }
+
+            if (hero == null || eventSystem == null)
+                return;
 
             // important: random events can trigger from room candidate list
             randomEventTimer += Time.deltaTime;
@@ -101,6 +104,8 @@ namespace Dungeon
 
             currentRoom = room;
 
+            generator.ExpandExitsForRoom(room, difficulty + 1);
+
             if (room.visited)
                 return;
 
@@ -110,7 +115,7 @@ namespace Dungeon
             generator.spawn_npc(difficulty, room);
 
             // important: first-time entry executes room events
-            if (room.definition?.candidateEvents != null)
+            if (eventSystem != null && room.definition?.candidateEvents != null)
             {
                 foreach (var evt in room.definition.candidateEvents)
                 {

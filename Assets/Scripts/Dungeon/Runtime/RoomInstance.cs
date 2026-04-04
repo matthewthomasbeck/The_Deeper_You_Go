@@ -13,9 +13,11 @@ namespace Dungeon
         public UnityEngine.GameObject prefabInstance;
 
         public bool visited = false;
-        public readonly HashSet<string> triggeredEventIds = new HashSet<string>();
 
-        public readonly Dictionary<DoorDirection, TilePos> doorTiles = new Dictionary<DoorDirection, TilePos>();
+        /// <summary>When true, <see cref="DungeonGenerator.ExpandExitsForRoom"/> has already run for this room.</summary>
+        public bool exitsExpanded = false;
+
+        public readonly HashSet<string> triggeredEventIds = new HashSet<string>();
 
         public readonly List<ActorBase> npcs = new List<ActorBase>();
         public readonly List<InteractableBase> interactables = new List<InteractableBase>();
