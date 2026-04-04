@@ -444,64 +444,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1856099715
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1856099717}
-  - component: {fileID: 1856099716}
-  m_Layer: 0
-  m_Name: DungeonGenerator
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &1856099716
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1856099715}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 6d8fc612402244ccc958c0090bebe0e0, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  roomTemplates:
-  - {fileID: 11400000, guid: 84795abf1220140f0abf3fc8c175e85f, type: 2}
-  - {fileID: 11400000, guid: c80b8966861144c6bb43c26abcc651e6, type: 2}
-  - {fileID: 11400000, guid: 668029aa5648243c689ba5706df7c258, type: 2}
-  npcTemplates: []
-  hallwayLeftRight: {fileID: 11400000, guid: 70127054708b649aa8d3d0b5de8fed56, type: 2}
-  hallwayUpDown: {fileID: 11400000, guid: 2287f3e3d6f3b4c34b86561328ce3c68, type: 2}
-  fallbackNpcPrefab: {fileID: 0}
-  fallbackInteractablePrefab: {fileID: 0}
-  spawnDungeonOnPlay: 1
-  spawnOnPlayDifficulty: 0
-  expandFirstRoomExitsOnPlay: 1
-  spawnHubThreeColumnsFourHallwaysOnly: 1
-  hubCenterRoomDefinition: {fileID: 11400000, guid: 84795abf1220140f0abf3fc8c175e85f, type: 2}
---- !u!4 &1856099717
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1856099715}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -509,4 +451,3 @@ SceneRoots:
   - {fileID: 330585546}
   - {fileID: 410087041}
   - {fileID: 832575519}
-  - {fileID: 1856099717}
