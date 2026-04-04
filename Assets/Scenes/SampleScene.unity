@@ -485,6 +485,8 @@ MonoBehaviour:
   spawnDungeonOnPlay: 1
   spawnOnPlayDifficulty: 0
   expandFirstRoomExitsOnPlay: 1
+  spawnHubThreeColumnsFourHallwaysOnly: 1
+  hubCenterRoomDefinition: {fileID: 11400000, guid: 84795abf1220140f0abf3fc8c175e85f, type: 2}
 --- !u!4 &1856099717
 Transform:
   m_ObjectHideFlags: 0
