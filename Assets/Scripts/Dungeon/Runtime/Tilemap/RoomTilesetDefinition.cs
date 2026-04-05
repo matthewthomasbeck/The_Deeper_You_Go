@@ -46,6 +46,10 @@ namespace Dungeon
         [Tooltip("South-east / bottom-right (e.g. rooms_13).")]
         public TileBase rugBottomRight;
 
+        [Header("Large-room columns (rug-wrapped); shaft uses wallTop (rooms_0) + this capital (rooms_10).")]
+        [Tooltip("Column capital / detail on top of shaft (e.g. rooms_10).")]
+        public TileBase columnCapital;
+
         [Header("Hallway ↔ room breach trim (uses wallTop / rooms_0 for row above hallway)")]
         [Tooltip("West breach: cell below hallway segment (e.g. rooms_2).")]
         public TileBase hallwayBreachWestLower;

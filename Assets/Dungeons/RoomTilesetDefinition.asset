@@ -30,6 +30,7 @@ MonoBehaviour:
   rugBottomLeft: {fileID: 11400000, guid: 4b8be5b662c374e8a904ad65db325ea7, type: 2}
   rugBottom: {fileID: 11400000, guid: 1775eabfceb7742948a36ef1c4328332, type: 2}
   rugBottomRight: {fileID: 11400000, guid: 2ac2fbef0511a4fd79bbaba32be17237, type: 2}
+  columnCapital: {fileID: 11400000, guid: 532940c29361644e6ae404a40b51b8ca, type: 2}
   hallwayBreachWestLower: {fileID: 11400000, guid: cb21565c8b66b47639489f3907a2f052, type: 2}
   hallwayBreachWestUpperCap: {fileID: 11400000, guid: d77ef7b2e55d6489884c6f6750dffb1e, type: 2}
   hallwayBreachEastLower: {fileID: 11400000, guid: 90903cee5d2f04201b7904b726bd6c52, type: 2}
