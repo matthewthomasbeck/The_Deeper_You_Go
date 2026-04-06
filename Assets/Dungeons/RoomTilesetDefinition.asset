@@ -31,12 +31,26 @@ MonoBehaviour:
   rugBottom: {fileID: 11400000, guid: 1775eabfceb7742948a36ef1c4328332, type: 2}
   rugBottomRight: {fileID: 11400000, guid: 2ac2fbef0511a4fd79bbaba32be17237, type: 2}
   columnCapital: {fileID: 11400000, guid: 532940c29361644e6ae404a40b51b8ca, type: 2}
+  columnSmallBase: {fileID: 11400000, guid: 816ff7af27cc64211a94d2a5ff6fc6e2, type: 2}
+  columnSmallCapital: {fileID: 11400000, guid: 7e71a9aaf36ad4ba29b1a726bf5013e1, type: 2}
   hallwayBreachWestLower: {fileID: 11400000, guid: cb21565c8b66b47639489f3907a2f052, type: 2}
   hallwayBreachWestUpperCap: {fileID: 11400000, guid: d77ef7b2e55d6489884c6f6750dffb1e, type: 2}
   hallwayBreachEastLower: {fileID: 11400000, guid: 90903cee5d2f04201b7904b726bd6c52, type: 2}
   hallwayBreachEastUpperCap: {fileID: 11400000, guid: 762e9256db0044aa6840c0a6c81f5e46, type: 2}
   illuminationA: {fileID: 11400000, guid: 9b692c4d6aec340569ff7516c631a8a8, type: 2}
   illuminationB: {fileID: 11400000, guid: f2e9af31acf1547ce82d69bb3808760a, type: 2}
+  furnishSmallAccent: {fileID: 11400000, guid: 4cd85437b83e945ed9c0e58624bb1430, type: 2}
+  mediumRugVariant25: {fileID: 11400000, guid: 5a32ad0a5687543a8a3b27b5b680ded8, type: 2}
+  mediumRugVariant26: {fileID: 11400000, guid: b0b64489b1d4e4c1987e533ff4f60716, type: 2}
+  mediumRugVariant27: {fileID: 11400000, guid: fb4943c81a976402cbad78f40193f0fb, type: 2}
+  merchantRugFill25: {fileID: 11400000, guid: 5a32ad0a5687543a8a3b27b5b680ded8, type: 2}
+  furnishMedium28: {fileID: 11400000, guid: 4999118c3ac4440f4acb56ff277e2171, type: 2}
+  furnishMedium29: {fileID: 11400000, guid: 1a78b4e5a0bfc44f897d64a0ef83bb8d, type: 2}
+  furnishMedium30: {fileID: 11400000, guid: aca079e39c19946f4a674c825ce1cd60, type: 2}
+  furnishMedium31: {fileID: 11400000, guid: e32a03ba255f74699afdcc3779ad3b0d, type: 2}
+  furnishMedium32: {fileID: 11400000, guid: 2502f555bfc8a43368365fa93491555e, type: 2}
+  furnishMedium33: {fileID: 11400000, guid: 694e1739150ed4fc39bd300893c79270, type: 2}
+  merchantTradingBench: {fileID: 11400000, guid: b0b64489b1d4e4c1987e533ff4f60716, type: 2}
   furnishWallA: {fileID: 11400000, guid: 4999118c3ac4440f4acb56ff277e2171, type: 2}
   furnishWallB: {fileID: 11400000, guid: 1a78b4e5a0bfc44f897d64a0ef83bb8d, type: 2}
   furnishWallC: {fileID: 11400000, guid: e32a03ba255f74699afdcc3779ad3b0d, type: 2}
@@ -46,7 +60,7 @@ MonoBehaviour:
   chestLargeRegular: {fileID: 11400000, guid: c266915db827a493a9243e08baaf3911, type: 2}
   chestLargeRare: {fileID: 11400000, guid: d3ffb2aa01ace4b42877c6ed3144d42a, type: 2}
   carpetTop: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
-  carpetBottom: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
+  carpetBottom: {fileID: 11400000, guid: 4c358fd20b49144ff88ce1625dc63905, type: 2}
   carpetLeft: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
   carpetRight: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
   carpetTopLeft: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}

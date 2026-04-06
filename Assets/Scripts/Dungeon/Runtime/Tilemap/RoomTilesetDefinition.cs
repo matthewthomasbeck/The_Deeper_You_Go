@@ -50,6 +50,11 @@ namespace Dungeon
         [Tooltip("Column capital / detail on top of shaft (e.g. rooms_10).")]
         public TileBase columnCapital;
 
+        [Header("Small-room columns (plain footprint; rooms_23 shaft, rooms_24 capital)")]
+        public TileBase columnSmallBase;
+        [Tooltip("Capital for small-room column stamp (e.g. rooms_24).")]
+        public TileBase columnSmallCapital;
+
         [Header("Hallway ↔ room breach trim (uses wallTop / rooms_0 for row above hallway)")]
         [Tooltip("West breach: cell below hallway segment (e.g. rooms_2).")]
         public TileBase hallwayBreachWestLower;
@@ -60,13 +65,35 @@ namespace Dungeon
         [Tooltip("East breach: second row above hallway, above wallTop (e.g. rooms_3).")]
         public TileBase hallwayBreachEastUpperCap;
 
-        [Header("Decoration overlay (rooms_40 / rooms_41) — draw on a second Tilemap above the base map")]
-        [Tooltip("Light / sconce variant A (e.g. rooms_40).")]
+        [Header("Decoration overlay — assign rooms_40 / rooms_41; draw on overlay Tilemap")]
+        [Tooltip("Merchant medium rooms (e.g. rooms_40).")]
         public TileBase illuminationA;
-        [Tooltip("Light / sconce variant B (e.g. rooms_41).")]
+        [Tooltip("Small + normal medium rooms (e.g. rooms_41).")]
         public TileBase illuminationB;
 
-        [Header("Wall furnishing overlay (rooms_28 / 29 / 31 / 35)")]
+        [Header("Small-room overlay furnish (e.g. rooms_34 on wallTop / small column / small floor)")]
+        public TileBase furnishSmallAccent;
+
+        [Header("Normal medium-room rug interior: random pick per cell among rooms_25–27")]
+        public TileBase mediumRugVariant25;
+        public TileBase mediumRugVariant26;
+        public TileBase mediumRugVariant27;
+
+        [Header("Merchant medium-room rug fill (e.g. rooms_25 only)")]
+        public TileBase merchantRugFill25;
+
+        [Header("Normal medium-room wall furnish overlay (rooms_28–33)")]
+        public TileBase furnishMedium28;
+        public TileBase furnishMedium29;
+        public TileBase furnishMedium30;
+        public TileBase furnishMedium31;
+        public TileBase furnishMedium32;
+        public TileBase furnishMedium33;
+
+        [Header("Merchant trading bench overlay (e.g. rooms_26)")]
+        public TileBase merchantTradingBench;
+
+        [Header("Legacy / optional wall furnish slots")]
         public TileBase furnishWallA;
         public TileBase furnishWallB;
         public TileBase furnishWallC;
@@ -84,6 +111,7 @@ namespace Dungeon
 
         [Header("Carpet borders")]
         public TileBase carpetTop;
+        [Tooltip("Also used as small-room floor swap for rooms_22 in DetailSmallRooms.")]
         public TileBase carpetBottom;
         public TileBase carpetLeft;
         public TileBase carpetRight;
