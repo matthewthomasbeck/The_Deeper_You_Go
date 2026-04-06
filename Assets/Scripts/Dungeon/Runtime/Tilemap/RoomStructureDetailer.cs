@@ -57,6 +57,17 @@ namespace Dungeon
         /// </summary>
         public static void DetailRoomStructure(Tilemap tilemap, Vector3Int origin, RoomTilesetDefinition tileset, RoomGrid floorGrid)
         {
+            DetailRoomStructure(tilemap, origin, tileset, floorGrid, null);
+        }
+
+        /// <param name="decorationTilemap">Optional overlay map; lights, props, and chests draw here so base <see cref="RoomTilesetDefinition.wallTop"/> tiles stay intact.</param>
+        public static void DetailRoomStructure(
+            Tilemap tilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            RoomGrid floorGrid,
+            Tilemap decorationTilemap)
+        {
             if (tilemap == null || tileset == null || floorGrid == null)
                 return;
 
@@ -81,10 +92,12 @@ namespace Dungeon
             for (int i = 0; i < components.Count; i++)
             {
                 if (areas[i] > threshold)
-                    DetailLargeRoom(tilemap, origin, tileset, components[i], i == bossIndex);
+                    DetailLargeRoom(tilemap, origin, tileset, components[i], i == bossIndex, floorGrid, decorationTilemap);
             }
 
             tilemap.RefreshAllTiles();
+            if (decorationTilemap != null)
+                decorationTilemap.RefreshAllTiles();
         }
 
         /// <summary>
@@ -95,7 +108,9 @@ namespace Dungeon
             Vector3Int origin,
             RoomTilesetDefinition tileset,
             HashSet<Vector2Int> roomCells,
-            bool isBossRoom = false)
+            bool isBossRoom = false,
+            RoomGrid floorGrid = null,
+            Tilemap decorationTilemap = null)
         {
             if (!HasAllRugTiles(tileset) || tileset.floorWood == null)
                 return;
@@ -145,19 +160,325 @@ namespace Dungeon
             if (isBossRoom)
                 DecorateBossRoom(tilemap, origin, tileset, roomCells);
             else
-                DecorateLargeRooms(tilemap, origin, tileset, roomCells);
+                DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells);
         }
 
         /// <summary>
-        /// Extra dressing for large rooms (currently column clusters). Invokes <see cref="BuildRoomColumns"/>.
+        /// Columns, then overlay lights, wall furnishings, and a chest on <paramref name="decorationTilemap"/>.
         /// </summary>
         public static void DecorateLargeRooms(
+            Tilemap decorationTilemap,
             Tilemap tilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            RoomGrid floorGrid,
+            HashSet<Vector2Int> roomCells)
+        {
+            BuildRoomColumns(tilemap, origin, tileset, roomCells);
+            IlluminateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells);
+            FurnishLargeRooms(decorationTilemap, tilemap, origin, tileset, roomCells);
+            if (tileset != null)
+                SpawnChests(
+                    decorationTilemap,
+                    tilemap,
+                    origin,
+                    tileset,
+                    roomCells,
+                    tileset.chestLargeRegular,
+                    tileset.chestLargeRare);
+        }
+
+        /// <summary>
+        /// Overlay sconces on breach-adjacent <see cref="RoomTilesetDefinition.wallTop"/> cells and on ~10% of column shafts (same tile), using <see cref="RoomTilesetDefinition.illuminationA"/> / <see cref="RoomTilesetDefinition.illuminationB"/>.
+        /// </summary>
+        public static void IlluminateLargeRooms(
+            Tilemap decorationTilemap,
+            Tilemap baseTilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            RoomGrid floorGrid,
+            HashSet<Vector2Int> roomCells)
+        {
+            if (decorationTilemap == null || baseTilemap == null || tileset == null || roomCells == null || roomCells.Count == 0)
+                return;
+            if (tileset.illuminationA == null && tileset.illuminationB == null)
+                return;
+            if (tileset.wallTop == null)
+                return;
+
+            int z = origin.z;
+            var lit = new HashSet<Vector2Int>();
+
+            if (floorGrid != null)
+            {
+                var breachCells = new HashSet<Vector2Int>();
+                CollectBreachAdjacentWallTopCells(floorGrid, roomCells, breachCells);
+                foreach (var p in breachCells)
+                {
+                    var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
+                    if (baseTilemap.GetTile(cell) != tileset.wallTop)
+                        continue;
+                    var pick = PickIlluminationTile(tileset);
+                    if (pick != null)
+                    {
+                        decorationTilemap.SetTile(cell, pick);
+                        lit.Add(p);
+                    }
+                }
+            }
+
+            var columnShafts = new List<Vector2Int>();
+            foreach (var p in roomCells)
+            {
+                var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
+                if (baseTilemap.GetTile(cell) == tileset.wallTop)
+                    columnShafts.Add(p);
+            }
+
+            int target = Mathf.CeilToInt(columnShafts.Count * 0.1f);
+            ShuffleVector2IntList(columnShafts);
+            int placedFromColumns = 0;
+            for (int i = 0; i < columnShafts.Count && placedFromColumns < target; i++)
+            {
+                var p = columnShafts[i];
+                if (lit.Contains(p))
+                    continue;
+                var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
+                if (baseTilemap.GetTile(cell) != tileset.wallTop)
+                    continue;
+                var pick = PickIlluminationTile(tileset);
+                if (pick == null)
+                    continue;
+                decorationTilemap.SetTile(cell, pick);
+                lit.Add(p);
+                placedFromColumns++;
+            }
+        }
+
+        /// <summary>
+        /// Overlay props on a random 30% (rounded) of eligible <see cref="RoomTilesetDefinition.wallTop"/> cells (perimeter + column shafts), using furnish tiles (e.g. rooms_28/29/31/35).
+        /// Runs after <see cref="IlluminateLargeRooms"/>; replaces overlay cells where both apply.
+        /// </summary>
+        public static void FurnishLargeRooms(
+            Tilemap decorationTilemap,
+            Tilemap baseTilemap,
             Vector3Int origin,
             RoomTilesetDefinition tileset,
             HashSet<Vector2Int> roomCells)
         {
-            BuildRoomColumns(tilemap, origin, tileset, roomCells);
+            if (decorationTilemap == null || baseTilemap == null || tileset == null || roomCells == null || roomCells.Count == 0)
+                return;
+            if (tileset.wallTop == null)
+                return;
+            if (tileset.furnishWallA == null && tileset.furnishWallB == null && tileset.furnishWallC == null
+                && tileset.furnishWallD == null)
+                return;
+
+            if (!TryGetBoundingBox(roomCells, out int minX, out int minY, out int maxX, out int maxY))
+                return;
+
+            minX--;
+            minY--;
+            maxX++;
+            maxY++;
+            int z = origin.z;
+
+            var candidates = new List<Vector2Int>();
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    var p = new Vector2Int(x, y);
+                    if (IsFurnishWallCandidate(baseTilemap, origin, tileset, roomCells, p, z))
+                        candidates.Add(p);
+                }
+            }
+
+            if (candidates.Count == 0)
+                return;
+
+            int target = Mathf.Clamp(Mathf.RoundToInt(candidates.Count * 0.3f), 0, candidates.Count);
+            if (target == 0)
+                return;
+
+            ShuffleVector2IntList(candidates);
+            for (int i = 0; i < target; i++)
+            {
+                var p = candidates[i];
+                var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
+                var furnish = PickRandomFurnishTile(tileset);
+                if (furnish != null)
+                    decorationTilemap.SetTile(cell, furnish);
+            }
+        }
+
+        /// <summary>
+        /// One chest per room on walkable floor; <paramref name="rareChance"/> selects <paramref name="rareChest"/> when non-null.
+        /// Use large-room tiles (e.g. 38/39) from <see cref="RoomTilesetDefinition.chestLargeRegular"/> or pass medium/small tiles (e.g. 37/38) from callers.
+        /// </summary>
+        public static void SpawnChests(
+            Tilemap decorationTilemap,
+            Tilemap baseTilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            HashSet<Vector2Int> roomCells,
+            TileBase regularChest,
+            TileBase rareChest,
+            float rareChance = 0.1f)
+        {
+            if (decorationTilemap == null || baseTilemap == null || tileset == null || roomCells == null || roomCells.Count == 0)
+                return;
+
+            TileBase chosen = null;
+            bool wantRare = UnityEngine.Random.value < Mathf.Clamp01(rareChance);
+            if (wantRare && rareChest != null)
+                chosen = rareChest;
+            if (chosen == null)
+                chosen = regularChest;
+            if (chosen == null)
+                chosen = rareChest;
+            if (chosen == null)
+                return;
+
+            var candidates = new List<Vector2Int>();
+            int z = origin.z;
+            foreach (var p in roomCells)
+            {
+                var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
+                if (!IsChestFloorCell(baseTilemap, cell, tileset))
+                    continue;
+                if (decorationTilemap.GetTile(cell) != null)
+                    continue;
+                candidates.Add(p);
+            }
+
+            if (candidates.Count == 0)
+                return;
+
+            var pick = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            var dest = new Vector3Int(origin.x + pick.x, origin.y + pick.y, z);
+            decorationTilemap.SetTile(dest, chosen);
+        }
+
+        private static void CollectBreachAdjacentWallTopCells(
+            RoomGrid floorGrid,
+            HashSet<Vector2Int> roomCells,
+            HashSet<Vector2Int> result)
+        {
+            result.Clear();
+            int w = floorGrid.width;
+            int h = floorGrid.height;
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    if (floorGrid.Get(x, y) != RoomTileKind.CorridorFloor)
+                        continue;
+
+                    bool roomEast = x + 1 < w && floorGrid.Get(x + 1, y) == RoomTileKind.FloorWood;
+                    bool roomWest = x > 0 && floorGrid.Get(x - 1, y) == RoomTileKind.FloorWood;
+                    if (roomEast != roomWest)
+                    {
+                        int rx = roomEast ? x + 1 : x - 1;
+                        if (roomCells.Contains(new Vector2Int(rx, y)))
+                        {
+                            if (y + 1 < h && !IsWalkableFloorKind(floorGrid, x, y + 1))
+                                result.Add(new Vector2Int(x, y + 1));
+                        }
+                    }
+
+                    bool roomToNorth = y + 1 < h && floorGrid.Get(x, y + 1) == RoomTileKind.FloorWood;
+                    bool roomToSouth = y > 0 && floorGrid.Get(x, y - 1) == RoomTileKind.FloorWood;
+                    if (roomToNorth && roomToSouth)
+                        continue;
+
+                    if (roomToSouth && roomCells.Contains(new Vector2Int(x, y - 1)))
+                    {
+                        if (x - 1 >= 0 && !IsWalkableFloorKind(floorGrid, x - 1, y))
+                            result.Add(new Vector2Int(x - 1, y));
+                        if (x + 1 < w && !IsWalkableFloorKind(floorGrid, x + 1, y))
+                            result.Add(new Vector2Int(x + 1, y));
+                    }
+                }
+            }
+        }
+
+        private static bool IsWalkableFloorKind(RoomGrid g, int x, int y)
+        {
+            if (x < 0 || y < 0 || x >= g.width || y >= g.height)
+                return false;
+            var k = g.Get(x, y);
+            return k == RoomTileKind.FloorWood || k == RoomTileKind.CorridorFloor;
+        }
+
+        private static TileBase PickIlluminationTile(RoomTilesetDefinition t)
+        {
+            if (t.illuminationA != null && t.illuminationB != null)
+                return UnityEngine.Random.value < 0.5f ? t.illuminationA : t.illuminationB;
+            return t.illuminationA != null ? t.illuminationA : t.illuminationB;
+        }
+
+        private static void ShuffleVector2IntList(List<Vector2Int> list)
+        {
+            for (int i = list.Count - 1; i > 0; i--)
+            {
+                int j = UnityEngine.Random.Range(0, i + 1);
+                var tmp = list[i];
+                list[i] = list[j];
+                list[j] = tmp;
+            }
+        }
+
+        private static TileBase PickRandomFurnishTile(RoomTilesetDefinition t)
+        {
+            var pool = new List<TileBase>(4);
+            if (t.furnishWallA != null)
+                pool.Add(t.furnishWallA);
+            if (t.furnishWallB != null)
+                pool.Add(t.furnishWallB);
+            if (t.furnishWallC != null)
+                pool.Add(t.furnishWallC);
+            if (t.furnishWallD != null)
+                pool.Add(t.furnishWallD);
+            if (pool.Count == 0)
+                return null;
+            return pool[UnityEngine.Random.Range(0, pool.Count)];
+        }
+
+        private static bool IsFurnishWallCandidate(
+            Tilemap baseTilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            HashSet<Vector2Int> roomCells,
+            Vector2Int p,
+            int z)
+        {
+            var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
+            if (baseTilemap.GetTile(cell) != tileset.wallTop)
+                return false;
+            if (roomCells.Contains(p))
+                return true;
+            if (roomCells.Contains(new Vector2Int(p.x - 1, p.y)))
+                return true;
+            if (roomCells.Contains(new Vector2Int(p.x + 1, p.y)))
+                return true;
+            if (roomCells.Contains(new Vector2Int(p.x, p.y - 1)))
+                return true;
+            if (roomCells.Contains(new Vector2Int(p.x, p.y + 1)))
+                return true;
+            return false;
+        }
+
+        private static bool IsChestFloorCell(Tilemap map, Vector3Int cell, RoomTilesetDefinition t)
+        {
+            var tile = map.GetTile(cell);
+            if (tile == null)
+                return false;
+            if (tile == t.wallTop)
+                return false;
+            if (t.columnCapital != null && tile == t.columnCapital)
+                return false;
+            return true;
         }
 
         /// <summary>

@@ -60,6 +60,28 @@ namespace Dungeon
         [Tooltip("East breach: second row above hallway, above wallTop (e.g. rooms_3).")]
         public TileBase hallwayBreachEastUpperCap;
 
+        [Header("Decoration overlay (rooms_40 / rooms_41) — draw on a second Tilemap above the base map")]
+        [Tooltip("Light / sconce variant A (e.g. rooms_40).")]
+        public TileBase illuminationA;
+        [Tooltip("Light / sconce variant B (e.g. rooms_41).")]
+        public TileBase illuminationB;
+
+        [Header("Wall furnishing overlay (rooms_28 / 29 / 31 / 35)")]
+        public TileBase furnishWallA;
+        public TileBase furnishWallB;
+        public TileBase furnishWallC;
+        public TileBase furnishWallD;
+
+        [Header("Chest tiles (assign for prefab-style pickups; large-room pipeline uses 38/39)")]
+        [Tooltip("Default small/medium regular chest (e.g. rooms_37).")]
+        public TileBase chestSmallMediumRegular;
+        [Tooltip("Default small/medium rare chest (e.g. rooms_38).")]
+        public TileBase chestSmallMediumRare;
+        [Tooltip("Large-room regular chest (e.g. rooms_38).")]
+        public TileBase chestLargeRegular;
+        [Tooltip("Large-room rare chest (e.g. rooms_39).")]
+        public TileBase chestLargeRare;
+
         [Header("Carpet borders")]
         public TileBase carpetTop;
         public TileBase carpetBottom;

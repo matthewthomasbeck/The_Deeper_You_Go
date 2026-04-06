@@ -17,6 +17,12 @@ namespace Dungeon
         [Tooltip("Optional. Leave empty to auto-create under this GameObject when createGridIfMissing is enabled.")]
         public Tilemap tilemap;
 
+        [Tooltip("Optional overlay Tilemap (sorting above tilemap) for lights, wall props, and chests without replacing base tiles.")]
+        public Tilemap decorationTilemap;
+
+        [Tooltip("When tilemap exists but decorationTilemap is empty, create a sibling Tilemap under the same Grid.")]
+        public bool createDecorationTilemapIfMissing = true;
+
         [Tooltip("Cell offset where the dungeon’s (0,0) is placed on the Tilemap.")]
         public Vector3Int originCell;
 
@@ -119,9 +125,16 @@ namespace Dungeon
             if (verboseLogs)
                 Debug.Log("[BspDungeon] Painting tilemap (base → floors → walls)…", this);
 
+            if (createDecorationTilemapIfMissing && decorationTilemap == null && tilemap != null)
+                EnsureDecorationTilemap();
+
+            if (decorationTilemap != null)
+                decorationTilemap.ClearAllTiles();
+
             BspTilemapPainter.Paint(tilemap, originCell, tileset, floorGrid);
             BspTilemapPainter.CleanUpRooms(tilemap, originCell, tileset, floorGrid);
-            RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid);
+
+            RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid, decorationTilemap);
 
             FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 
@@ -170,7 +183,36 @@ namespace Dungeon
             var tm = mapGo.AddComponent<Tilemap>();
             var tr = mapGo.AddComponent<TilemapRenderer>();
             tr.sortingOrder = 10;
+
+            if (createDecorationTilemapIfMissing)
+            {
+                var decGo = new GameObject("DungeonDecoration");
+                decGo.transform.SetParent(gridGo.transform, false);
+                var decTm = decGo.AddComponent<Tilemap>();
+                var decTr = decGo.AddComponent<TilemapRenderer>();
+                decTr.sortingOrder = tr.sortingOrder + 1;
+                decorationTilemap = decTm;
+            }
+
             return tm;
+        }
+
+        private void EnsureDecorationTilemap()
+        {
+            var grid = tilemap.GetComponentInParent<Grid>();
+            if (grid == null)
+                return;
+
+            var decGo = new GameObject("DungeonDecoration");
+            decGo.transform.SetParent(grid.transform, false);
+            var decTm = decGo.AddComponent<Tilemap>();
+            var decTr = decGo.AddComponent<TilemapRenderer>();
+            int baseOrder = 0;
+            var baseR = tilemap.GetComponent<TilemapRenderer>();
+            if (baseR != null)
+                baseOrder = baseR.sortingOrder;
+            decTr.sortingOrder = baseOrder + 1;
+            decorationTilemap = decTm;
         }
     }
 }

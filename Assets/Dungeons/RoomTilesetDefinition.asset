@@ -35,6 +35,16 @@ MonoBehaviour:
   hallwayBreachWestUpperCap: {fileID: 11400000, guid: d77ef7b2e55d6489884c6f6750dffb1e, type: 2}
   hallwayBreachEastLower: {fileID: 11400000, guid: 90903cee5d2f04201b7904b726bd6c52, type: 2}
   hallwayBreachEastUpperCap: {fileID: 11400000, guid: 762e9256db0044aa6840c0a6c81f5e46, type: 2}
+  illuminationA: {fileID: 11400000, guid: 9b692c4d6aec340569ff7516c631a8a8, type: 2}
+  illuminationB: {fileID: 11400000, guid: f2e9af31acf1547ce82d69bb3808760a, type: 2}
+  furnishWallA: {fileID: 11400000, guid: 4999118c3ac4440f4acb56ff277e2171, type: 2}
+  furnishWallB: {fileID: 11400000, guid: 1a78b4e5a0bfc44f897d64a0ef83bb8d, type: 2}
+  furnishWallC: {fileID: 11400000, guid: e32a03ba255f74699afdcc3779ad3b0d, type: 2}
+  furnishWallD: {fileID: 11400000, guid: 66242e60b21c2405f96558a1832414bc, type: 2}
+  chestSmallMediumRegular: {fileID: 11400000, guid: 25c0c010d06814f97bbce5739aa4a5d2, type: 2}
+  chestSmallMediumRare: {fileID: 11400000, guid: c266915db827a493a9243e08baaf3911, type: 2}
+  chestLargeRegular: {fileID: 11400000, guid: c266915db827a493a9243e08baaf3911, type: 2}
+  chestLargeRare: {fileID: 11400000, guid: d3ffb2aa01ace4b42877c6ed3144d42a, type: 2}
   carpetTop: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
   carpetBottom: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
   carpetLeft: {fileID: 11400000, guid: 5fa23f030f0b0448b93b2f200ef50160, type: 2}
