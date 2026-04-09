@@ -148,6 +148,30 @@ namespace Dungeon
                 _ => empty,
             };
         }
+
+        public bool IsLightSourceTile(TileBase tile)
+        {
+            if (tile == null)
+                return false;
+
+            return tile == illuminationA
+                   || tile == illuminationB
+                   || tile == furnishMedium32
+                   || tile == chestLargeRare;
+        }
+
+        public bool IsWallBlockerTile(TileBase tile)
+        {
+            if (tile == null)
+                return false;
+
+            return tile == wallTop
+                   || tile == wallTopCap
+                   || tile == wallBottom
+                   || tile == wallLeft
+                   || tile == wallRight
+                   || tile == wallCorner;
+        }
     }
 }
 

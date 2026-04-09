@@ -23,6 +23,15 @@ namespace Dungeon
         [Tooltip("When tilemap exists but decorationTilemap is empty, create a sibling Tilemap under the same Grid.")]
         public bool createDecorationTilemapIfMissing = true;
 
+        [Header("Runtime 2D lighting")]
+        [Tooltip("If true, rebuilds wall shadow blockers and point lights from decoration tiles each generation.")]
+        public bool buildRuntimeLighting = true;
+        [Range(0f, 3f)] public float runtimeLightIntensity = 0.9f;
+        [Range(0f, 5f)] public float runtimeLightInnerRadius = 0.5f;
+        [Range(0f, 10f)] public float runtimeLightOuterRadius = 3.5f;
+        [Range(0f, 1f)] public float runtimeLightShadowIntensity = 0.85f;
+        public Color runtimeLightColor = Color.white;
+
         [Tooltip("Cell offset where the dungeon’s (0,0) is placed on the Tilemap.")]
         public Vector3Int originCell;
 
@@ -135,6 +144,20 @@ namespace Dungeon
             BspTilemapPainter.CleanUpRooms(tilemap, originCell, tileset, floorGrid);
 
             RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid, decorationTilemap);
+
+            if (buildRuntimeLighting)
+            {
+                DungeonLightingBuilder.Rebuild(
+                    tilemap,
+                    decorationTilemap,
+                    tileset,
+                    originCell,
+                    runtimeLightIntensity,
+                    runtimeLightInnerRadius,
+                    runtimeLightOuterRadius,
+                    runtimeLightShadowIntensity,
+                    runtimeLightColor);
+            }
 
             FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 
