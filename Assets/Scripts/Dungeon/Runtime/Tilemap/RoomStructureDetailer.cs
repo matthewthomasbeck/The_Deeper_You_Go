@@ -166,7 +166,7 @@ namespace Dungeon
             for (int i = 0; i < components.Count; i++)
             {
                 if (areas[i] > largeThreshold)
-                    DetailLargeRoom(tilemap, origin, tileset, components[i], i == bossIndex, decorationTilemap);
+                    DetailLargeRoom(tilemap, origin, tileset, components[i], i == bossIndex, decorationTilemap, floorGrid);
             }
 
             tilemap.RefreshAllTiles();
@@ -289,7 +289,8 @@ namespace Dungeon
             RoomTilesetDefinition tileset,
             HashSet<Vector2Int> roomCells,
             bool isBossRoom = false,
-            Tilemap decorationTilemap = null)
+            Tilemap decorationTilemap = null,
+            RoomGrid floorGrid = null)
         {
             if (!HasAllRugTiles(tileset) || tileset.floorWood == null)
                 return;
@@ -318,7 +319,7 @@ namespace Dungeon
                 if (isBossRoom)
                     DecorateBossRoom(tilemap, origin, tileset, roomCells);
                 else
-                    DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, roomCells);
+                    DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells);
                 return;
             }
 
@@ -349,7 +350,7 @@ namespace Dungeon
             if (isBossRoom)
                 DecorateBossRoom(tilemap, origin, tileset, roomCells);
             else
-                DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, roomCells);
+                DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells);
         }
 
         /// <summary>Columns, overlay light (rooms_41), 10% furnish (rooms_34), 10% rare chest (rooms_37) only.</summary>
@@ -401,9 +402,7 @@ namespace Dungeon
                 roomCells,
                 style,
                 singlesOnlyRandomPlacement: false,
-                minBfsStepsFromRoomEdge: 0,
-                maxBfsFromPerimeterInclusive: 1,
-                requireFootprintTouchesFloorWood: true);
+                minBfsStepsFromRoomEdge: 0);
             IlluminateSmallRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells, style);
             FurnishNormalMediumRooms(decorationTilemap, tilemap, origin, tileset, roomCells);
             SpawnChests(
@@ -461,6 +460,7 @@ namespace Dungeon
             Tilemap tilemap,
             Vector3Int origin,
             RoomTilesetDefinition tileset,
+            RoomGrid floorGrid,
             HashSet<Vector2Int> roomCells)
         {
             var style = ColumnStampStyle.LargeRoom(tileset);
@@ -472,6 +472,8 @@ namespace Dungeon
                 style,
                 singlesOnlyRandomPlacement: false,
                 minBfsStepsFromRoomEdge: 2);
+            IlluminateSmallRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells, style);
+            FurnishNormalMediumRooms(decorationTilemap, tilemap, origin, tileset, roomCells);
             SpawnChests(
                 decorationTilemap,
                 tilemap,
@@ -771,8 +773,9 @@ namespace Dungeon
             if (!TryGetBoundingBox(roomCells, out int rminX, out int rminY, out int rmaxX, out int rmaxY))
                 return;
 
-            int w = 5;
-            int h = 5;
+            bool compact = UseCompactMediumColumnFootprint(tileset, columnStyle);
+            int w = compact ? 3 : 5;
+            int h = compact ? 3 : 5;
             int countAtWaveStart = singlesPlaced;
 
             for (int attempt = 0;
@@ -824,8 +827,9 @@ namespace Dungeon
             if (!TryGetBoundingBox(roomCells, out int rminX, out int rminY, out int rmaxX, out int rmaxY))
                 return;
 
-            const int w = 5;
-            const int h = 5;
+            bool compact = UseCompactMediumColumnFootprint(tileset, columnStyle);
+            int w = compact ? 3 : 5;
+            int h = compact ? 3 : 5;
             if (rmaxX - rminX + 1 < w || rmaxY - rminY + 1 < h)
                 return;
 
@@ -891,10 +895,11 @@ namespace Dungeon
             for (int attempt = 0; attempt < 280; attempt++)
             {
                 int n = UnityEngine.Random.Range(2, 6);
-                int fw = 2 * n + 3;
-                int fh = 5;
-                int vw = 5;
-                int vh = 2 * n + 3;
+                bool compact = UseCompactMediumColumnFootprint(tileset, columnStyle);
+                int fw = compact ? 2 * n + 1 : 2 * n + 3;
+                int fh = compact ? 3 : 5;
+                int vw = compact ? 3 : 5;
+                int vh = compact ? 2 * n + 1 : 2 * n + 3;
                 int rw = rmaxX - rminX + 1;
                 int rh = rmaxY - rminY + 1;
                 bool canH = rw >= fw && rh >= fh;
@@ -1068,14 +1073,15 @@ namespace Dungeon
             int ax,
             int ay)
         {
-            int w = 2 * columnCount + 3;
-            int h = 5;
+            bool compact = UseCompactMediumColumnFootprint(tileset, style);
+            int w = compact ? 2 * columnCount + 1 : 2 * columnCount + 3;
+            int h = compact ? 3 : 5;
             int z = origin.z;
             for (int ly = 0; ly < h; ly++)
             {
                 for (int lx = 0; lx < w; lx++)
                 {
-                    var tile = PickHorizontalColumnTile(tileset, style, columnCount, lx, ly, w);
+                    var tile = PickHorizontalColumnTile(tileset, style, columnCount, lx, ly, w, h);
                     if (tile == null)
                         continue;
                     int wx = ax + lx;
@@ -1095,14 +1101,15 @@ namespace Dungeon
             int ax,
             int ay)
         {
-            int w = 5;
-            int h = 2 * columnCount + 3;
+            bool compact = UseCompactMediumColumnFootprint(tileset, style);
+            int w = compact ? 3 : 5;
+            int h = compact ? 2 * columnCount + 1 : 2 * columnCount + 3;
             int z = origin.z;
             for (int ly = 0; ly < h; ly++)
             {
                 for (int lx = 0; lx < w; lx++)
                 {
-                    var tile = PickVerticalStackColumnTile(tileset, style, columnCount, lx, ly, h);
+                    var tile = PickVerticalStackColumnTile(tileset, style, columnCount, lx, ly, w, h);
                     if (tile == null)
                         continue;
                     int wx = ax + lx;
@@ -1118,8 +1125,20 @@ namespace Dungeon
             int n,
             int lx,
             int ly,
-            int w)
+            int w,
+            int h)
         {
+            bool compact = UseCompactMediumColumnFootprint(t, s);
+            if (compact)
+            {
+                var mediumFill = PickMediumRugRandomTile(t) ?? s.FloorFill;
+                if (ly == h - 1)
+                    return mediumFill;
+                if ((lx & 1) == 0)
+                    return mediumFill;
+                return ly == 0 ? s.ColumnCapital : s.ColumnBase;
+            }
+
             if (s.HasCarpetBorders)
         {
             if (ly == 0)
@@ -1193,9 +1212,20 @@ namespace Dungeon
             int n,
             int lx,
             int ly,
+            int w,
             int h)
         {
-            const int w = 5;
+            bool compact = UseCompactMediumColumnFootprint(t, s);
+            if (compact)
+            {
+                var mediumFill = PickMediumRugRandomTile(t) ?? s.FloorFill;
+                if (lx != 1)
+                    return mediumFill;
+                if (ly == h - 1)
+                    return mediumFill;
+                return (ly & 1) == 0 ? s.ColumnCapital : s.ColumnBase;
+            }
+
             if (s.HasCarpetBorders)
             {
             if (ly == 0)
@@ -1258,6 +1288,11 @@ namespace Dungeon
             }
 
             return s.FloorFill;
+        }
+
+        private static bool UseCompactMediumColumnFootprint(RoomTilesetDefinition t, ColumnStampStyle s)
+        {
+            return !s.HasCarpetBorders && s.ColumnBase == t.wallTop && s.FloorFill == t.floorWood;
         }
 
         private static bool HasAllRugTiles(RoomTilesetDefinition t)
