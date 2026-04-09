@@ -268,11 +268,15 @@ namespace Dungeon
                     rugCells.Add(p);
             }
 
-            if (rugCells.Count == 0)
-                return;
-
             int z = origin.z;
             var fill = tileset.merchantRugFill25;
+            if (rugCells.Count == 0)
+            {
+                foreach (var p in roomCells)
+                    tilemap.SetTile(new Vector3Int(origin.x + p.x, origin.y + p.y, z), fill);
+                return;
+            }
+
             foreach (var p in rugCells)
                 tilemap.SetTile(new Vector3Int(origin.x + p.x, origin.y + p.y, z), fill);
 
@@ -418,7 +422,7 @@ namespace Dungeon
                 guaranteeOneChest: true);
         }
 
-        /// <summary>No columns; merchant rug already applied. Light rooms_40, 30% furnish 28–33, trading bench rooms_26 every room.</summary>
+        /// <summary>No columns; merchant rug already applied. Light rooms_40, 30% furnish 28–33, and guaranteed merchant desk (rooms_36 via chest placement).</summary>
         public static void DecorateMerchantMediumRooms(
             Tilemap decorationTilemap,
             Tilemap tilemap,
@@ -430,7 +434,7 @@ namespace Dungeon
             var style = ColumnStampStyle.MediumRoom(tileset);
             IlluminateMerchantMediumRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells, style);
             FurnishNormalMediumRooms(decorationTilemap, tilemap, origin, tileset, roomCells);
-            var bench = tileset.merchantTradingBench;
+            var bench = tileset.merchantTradingBench ?? tileset.chestSmallMediumRegular ?? tileset.chestSmallMediumRare;
             SpawnChests(
                 decorationTilemap,
                 tilemap,
@@ -440,17 +444,6 @@ namespace Dungeon
                 bench,
                 bench,
                 1f,
-                style,
-                guaranteeOneChest: true);
-            SpawnChests(
-                decorationTilemap,
-                tilemap,
-                origin,
-                tileset,
-                roomCells,
-                tileset.chestSmallMediumRegular,
-                tileset.chestSmallMediumRare,
-                0.1f,
                 style,
                 guaranteeOneChest: true);
         }
