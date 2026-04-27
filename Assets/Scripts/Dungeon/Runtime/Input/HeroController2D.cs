@@ -1,4 +1,7 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Dungeon
 {
@@ -64,15 +67,52 @@ namespace Dungeon
 
         private void ReadMoveInput()
         {
-            float x = 0f;
-            float y = 0f;
+            moveInput = ReadMoveInputVector().normalized;
+        }
 
-            if (Input.GetKey(KeyCode.A)) x -= 1f;
-            if (Input.GetKey(KeyCode.D)) x += 1f;
-            if (Input.GetKey(KeyCode.S)) y -= 1f;
-            if (Input.GetKey(KeyCode.W)) y += 1f;
+        private Vector2 ReadMoveInputVector()
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+            {
+                float x = 0f;
+                float y = 0f;
 
-            moveInput = new Vector2(x, y).normalized;
+                if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) x -= 1f;
+                if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) x += 1f;
+                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) y -= 1f;
+                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) y += 1f;
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+                // Fallback if old input bindings exist and no new-system key is pressed.
+                if (Mathf.Approximately(x, 0f))
+                    x = Input.GetAxisRaw("Horizontal");
+                if (Mathf.Approximately(y, 0f))
+                    y = Input.GetAxisRaw("Vertical");
+#endif
+
+                return new Vector2(x, y);
+            }
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+            float legacyX = 0f;
+            float legacyY = 0f;
+
+            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) legacyX -= 1f;
+            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) legacyX += 1f;
+            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) legacyY -= 1f;
+            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) legacyY += 1f;
+
+            if (Mathf.Approximately(legacyX, 0f))
+                legacyX = Input.GetAxisRaw("Horizontal");
+            if (Mathf.Approximately(legacyY, 0f))
+                legacyY = Input.GetAxisRaw("Vertical");
+
+            return new Vector2(legacyX, legacyY);
+#else
+            return Vector2.zero;
+#endif
         }
 
 
@@ -83,10 +123,10 @@ namespace Dungeon
             if (worldCamera == null)
                 return;
 
-            if (Input.GetMouseButtonDown(0))
+            if (IsLeftMouseDown())
                 HandleLeftClick();
 
-            if (Input.GetMouseButtonDown(1))
+            if (IsRightMouseDown())
                 HandleRightClick();
         }
 
@@ -147,12 +187,54 @@ namespace Dungeon
 
         private Collider2D GetColliderUnderMouse()
         {
-            var mouse = Input.mousePosition;
+            var mouse = GetMouseScreenPosition();
             var world = worldCamera.ScreenToWorldPoint(mouse);
             var origin = new Vector2(world.x, world.y);
 
             // important: click-pick uses point overlap for 2d
             return Physics2D.OverlapPoint(origin);
+        }
+
+        private bool IsLeftMouseDown()
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+                return Mouse.current.leftButton.wasPressedThisFrame;
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetMouseButtonDown(0);
+#else
+            return false;
+#endif
+        }
+
+        private bool IsRightMouseDown()
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+                return Mouse.current.rightButton.wasPressedThisFrame;
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.GetMouseButtonDown(1);
+#else
+            return false;
+#endif
+        }
+
+        private Vector2 GetMouseScreenPosition()
+        {
+#if ENABLE_INPUT_SYSTEM
+            if (Mouse.current != null)
+                return Mouse.current.position.ReadValue();
+#endif
+
+#if ENABLE_LEGACY_INPUT_MANAGER
+            return Input.mousePosition;
+#else
+            return Vector2.zero;
+#endif
         }
 
 
