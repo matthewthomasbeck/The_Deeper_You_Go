@@ -19,6 +19,11 @@ namespace Dungeon
         public Camera worldCamera;
         public ItemActionSystem itemActionSystem;
         public InteractableInventoryUI interactableInventoryUI;
+        public SpriteRenderer headRenderer;
+        public SpriteRenderer legsRenderer;
+        public SpriteRenderer torsoRenderer;
+        public int heroBaseSortingOrder = 200;
+        public bool keepCameraCenteredOnHero = true;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -40,6 +45,8 @@ namespace Dungeon
 
             if (worldCamera == null)
                 worldCamera = Camera.main;
+
+            EnsureHeroVisibleOnTop();
         }
 
 
@@ -57,6 +64,15 @@ namespace Dungeon
         private void FixedUpdate()
         {
             rb.linearVelocity = moveInput * moveSpeedUnitsPerSecond;
+        }
+
+        private void LateUpdate()
+        {
+            if (!keepCameraCenteredOnHero || worldCamera == null)
+                return;
+
+            Vector3 camPos = worldCamera.transform.position;
+            worldCamera.transform.position = new Vector3(transform.position.x, transform.position.y, camPos.z);
         }
 
 
@@ -82,37 +98,10 @@ namespace Dungeon
                 if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) x += 1f;
                 if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) y -= 1f;
                 if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) y += 1f;
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-                // Fallback if old input bindings exist and no new-system key is pressed.
-                if (Mathf.Approximately(x, 0f))
-                    x = Input.GetAxisRaw("Horizontal");
-                if (Mathf.Approximately(y, 0f))
-                    y = Input.GetAxisRaw("Vertical");
-#endif
-
                 return new Vector2(x, y);
             }
 #endif
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-            float legacyX = 0f;
-            float legacyY = 0f;
-
-            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) legacyX -= 1f;
-            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) legacyX += 1f;
-            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) legacyY -= 1f;
-            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) legacyY += 1f;
-
-            if (Mathf.Approximately(legacyX, 0f))
-                legacyX = Input.GetAxisRaw("Horizontal");
-            if (Mathf.Approximately(legacyY, 0f))
-                legacyY = Input.GetAxisRaw("Vertical");
-
-            return new Vector2(legacyX, legacyY);
-#else
             return Vector2.zero;
-#endif
         }
 
 
@@ -201,12 +190,7 @@ namespace Dungeon
             if (Mouse.current != null)
                 return Mouse.current.leftButton.wasPressedThisFrame;
 #endif
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-            return Input.GetMouseButtonDown(0);
-#else
             return false;
-#endif
         }
 
         private bool IsRightMouseDown()
@@ -215,12 +199,7 @@ namespace Dungeon
             if (Mouse.current != null)
                 return Mouse.current.rightButton.wasPressedThisFrame;
 #endif
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-            return Input.GetMouseButtonDown(1);
-#else
             return false;
-#endif
         }
 
         private Vector2 GetMouseScreenPosition()
@@ -229,12 +208,48 @@ namespace Dungeon
             if (Mouse.current != null)
                 return Mouse.current.position.ReadValue();
 #endif
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-            return Input.mousePosition;
-#else
             return Vector2.zero;
-#endif
+        }
+
+        private void EnsureHeroVisibleOnTop()
+        {
+            if (headRenderer == null || legsRenderer == null || torsoRenderer == null)
+            {
+                var renderers = GetComponentsInChildren<SpriteRenderer>(true);
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    var sr = renderers[i];
+                    if (sr == null) continue;
+                    var n = sr.gameObject.name.ToLowerInvariant();
+                    if (headRenderer == null && n.Contains("head")) headRenderer = sr;
+                    else if (legsRenderer == null && n.Contains("legs")) legsRenderer = sr;
+                    else if (torsoRenderer == null && n.Contains("torso")) torsoRenderer = sr;
+                }
+            }
+
+            if (headRenderer != null) { headRenderer.enabled = true; headRenderer.sortingOrder = heroBaseSortingOrder; }
+            if (legsRenderer != null) { legsRenderer.enabled = true; legsRenderer.sortingOrder = heroBaseSortingOrder + 1; }
+            if (torsoRenderer != null) { torsoRenderer.enabled = true; torsoRenderer.sortingOrder = heroBaseSortingOrder + 2; }
+
+            EnsureRendererUsesLitShader(headRenderer);
+            EnsureRendererUsesLitShader(legsRenderer);
+            EnsureRendererUsesLitShader(torsoRenderer);
+        }
+
+        private void EnsureRendererUsesLitShader(SpriteRenderer sr)
+        {
+            if (sr == null)
+                return;
+
+            Shader lit = Shader.Find("Universal Render Pipeline/2D/Sprite-Lit-Default");
+            if (lit == null)
+                return;
+
+            var current = sr.sharedMaterial;
+            if (current != null && current.shader == lit)
+                return;
+
+            sr.sharedMaterial = new Material(lit);
         }
 
 
