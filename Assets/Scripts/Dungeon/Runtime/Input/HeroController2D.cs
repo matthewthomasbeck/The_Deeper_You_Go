@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Tilemaps;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -23,7 +24,10 @@ namespace Dungeon
         public SpriteRenderer legsRenderer;
         public SpriteRenderer torsoRenderer;
         public int heroBaseSortingOrder = 200;
+        public int heroOccludedSortingOrder = 7;
         public bool keepCameraCenteredOnHero = true;
+        public Tilemap dungeonTilemap;
+        public RoomTilesetDefinition roomTileset;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -46,6 +50,7 @@ namespace Dungeon
             if (worldCamera == null)
                 worldCamera = Camera.main;
 
+            AutoResolveDungeonReferences();
             EnsureHeroVisibleOnTop();
         }
 
@@ -68,6 +73,8 @@ namespace Dungeon
 
         private void LateUpdate()
         {
+            UpdateHeroOcclusionSorting();
+
             if (!keepCameraCenteredOnHero || worldCamera == null)
                 return;
 
@@ -234,6 +241,60 @@ namespace Dungeon
             EnsureRendererUsesLitShader(headRenderer);
             EnsureRendererUsesLitShader(legsRenderer);
             EnsureRendererUsesLitShader(torsoRenderer);
+        }
+
+        private void UpdateHeroOcclusionSorting()
+        {
+            int baseOrder = heroBaseSortingOrder;
+            if (ShouldOccludeHeroByCurrentTile())
+                baseOrder = heroOccludedSortingOrder;
+
+            if (headRenderer != null) headRenderer.sortingOrder = baseOrder;
+            if (legsRenderer != null) legsRenderer.sortingOrder = baseOrder + 1;
+            if (torsoRenderer != null) torsoRenderer.sortingOrder = baseOrder + 2;
+        }
+
+        private bool ShouldOccludeHeroByCurrentTile()
+        {
+            if (dungeonTilemap == null || roomTileset == null)
+            {
+                AutoResolveDungeonReferences();
+                return false;
+            }
+
+            Vector3Int cell = dungeonTilemap.WorldToCell(transform.position);
+            TileBase tile = dungeonTilemap.GetTile(cell);
+            if (tile == null)
+                return false;
+
+            return tile == roomTileset.columnCapital || tile == roomTileset.columnSmallCapital;
+        }
+
+        private void AutoResolveDungeonReferences()
+        {
+            if (dungeonTilemap == null)
+            {
+                var allTilemaps = Object.FindObjectsByType<Tilemap>(FindObjectsSortMode.None);
+                for (int i = 0; i < allTilemaps.Length; i++)
+                {
+                    var tm = allTilemaps[i];
+                    if (tm != null && tm.name == "DungeonTilemap")
+                    {
+                        dungeonTilemap = tm;
+                        break;
+                    }
+                }
+
+                if (dungeonTilemap == null && allTilemaps.Length > 0)
+                    dungeonTilemap = allTilemaps[0];
+            }
+
+            if (roomTileset == null)
+            {
+                var bootstrap = Object.FindFirstObjectByType<BspDungeonBootstrap>();
+                if (bootstrap != null)
+                    roomTileset = bootstrap.tileset;
+            }
         }
 
         private void EnsureRendererUsesLitShader(SpriteRenderer sr)

@@ -165,12 +165,14 @@ namespace Dungeon
             if (tile == null)
                 return false;
 
-            return tile == wallTop
-                   || tile == wallTopCap
+            return tile == wallTopCap
                    || tile == wallBottom
                    || tile == wallLeft
                    || tile == wallRight
-                   || tile == wallCorner;
+                   || tile == wallCorner
+                   || tile == hallwayBreachEastUpperCap
+                   || tile == hallwayBreachWestUpperCap
+                   || tile == columnSmallBase;
         }
     }
 }
