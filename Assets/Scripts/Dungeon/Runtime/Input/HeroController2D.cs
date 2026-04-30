@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
+using System.Collections.Generic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -24,10 +25,17 @@ namespace Dungeon
         public SpriteRenderer legsRenderer;
         public SpriteRenderer torsoRenderer;
         public int heroBaseSortingOrder = 200;
-        public int heroOccludedSortingOrder = 7;
+        public int heroOccludedSortingOrder = 9;
         public bool keepCameraCenteredOnHero = true;
         public Tilemap dungeonTilemap;
         public RoomTilesetDefinition roomTileset;
+        public float runCycleDurationSeconds = 1f;
+
+        [Header("Hero Selection UI")]
+        public bool showHeroSelectionBar = true;
+        public Vector2 heroBarPosition = new Vector2(12f, 12f);
+        public float heroBarSize = 56f;
+        public int heroCount = 5;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -35,6 +43,12 @@ namespace Dungeon
         private ActorBase hero;
         private Rigidbody2D rb;
         private Vector2 moveInput;
+        private float runTimerSeconds;
+        private int currentHeroIndex = 0;
+        private Sprite[][] headSets;
+        private Sprite[][] legsSets;
+        private Sprite[][] torsoSets;
+        private Dictionary<string, Sprite> spriteLookup;
 
 
 
@@ -52,6 +66,8 @@ namespace Dungeon
 
             AutoResolveDungeonReferences();
             EnsureHeroVisibleOnTop();
+            LoadHeroSpriteSets();
+            ApplyCurrentHeroFrame(0);
         }
 
 
@@ -60,6 +76,7 @@ namespace Dungeon
         private void Update()
         {
             ReadMoveInput();
+            UpdateHeroAnimation();
             HandleMouseInput();
         }
 
@@ -80,6 +97,41 @@ namespace Dungeon
 
             Vector3 camPos = worldCamera.transform.position;
             worldCamera.transform.position = new Vector3(transform.position.x, transform.position.y, camPos.z);
+        }
+
+        private void OnGUI()
+        {
+            if (!showHeroSelectionBar || headSets == null || currentHeroIndex < 0 || currentHeroIndex >= headSets.Length)
+                return;
+
+            var icon = headSets[currentHeroIndex] != null && headSets[currentHeroIndex].Length > 0
+                ? headSets[currentHeroIndex][0]
+                : null;
+            if (icon == null || icon.texture == null)
+                return;
+
+            float x = heroBarPosition.x;
+            float y = heroBarPosition.y;
+            float size = Mathf.Max(24f, heroBarSize);
+            Rect barRect = new Rect(x, y, size, size);
+            Rect iconRect = new Rect(x + 6f, y + 6f, size - 12f, size - 12f);
+
+            Color old = GUI.color;
+            GUI.color = new Color(0f, 0f, 0f, 0.65f);
+            GUI.Box(barRect, GUIContent.none);
+            GUI.color = Color.white;
+
+            Rect texCoords = new Rect(
+                icon.textureRect.x / icon.texture.width,
+                icon.textureRect.y / icon.texture.height,
+                icon.textureRect.width / icon.texture.width,
+                icon.textureRect.height / icon.texture.height);
+            GUI.DrawTextureWithTexCoords(iconRect, icon.texture, texCoords, true);
+
+            if (GUI.Button(barRect, GUIContent.none, GUIStyle.none))
+                CycleToNextHero();
+
+            GUI.color = old;
         }
 
 
@@ -241,6 +293,115 @@ namespace Dungeon
             EnsureRendererUsesLitShader(headRenderer);
             EnsureRendererUsesLitShader(legsRenderer);
             EnsureRendererUsesLitShader(torsoRenderer);
+        }
+
+        private void LoadHeroSpriteSets()
+        {
+            spriteLookup = BuildSpriteLookup();
+            int count = Mathf.Max(1, heroCount);
+            headSets = new Sprite[count][];
+            legsSets = new Sprite[count][];
+            torsoSets = new Sprite[count][];
+
+            for (int i = 0; i < count; i++)
+            {
+                headSets[i] = LoadPartFrames(i, "head");
+                legsSets[i] = LoadPartFrames(i, "legs");
+                torsoSets[i] = LoadPartFrames(i, "torso");
+            }
+        }
+
+        private Sprite[] LoadPartFrames(int heroIndex, string part)
+        {
+            var frames = new Sprite[5];
+            frames[0] = GetSpriteByName($"h{heroIndex}-{part}-idle");
+            frames[1] = GetSpriteByName($"h{heroIndex}-{part}-r1");
+            frames[2] = GetSpriteByName($"h{heroIndex}-{part}-r2");
+            frames[3] = GetSpriteByName($"h{heroIndex}-{part}-l1");
+            frames[4] = GetSpriteByName($"h{heroIndex}-{part}-l2");
+            return frames;
+        }
+
+        private Dictionary<string, Sprite> BuildSpriteLookup()
+        {
+            var lookup = new Dictionary<string, Sprite>();
+            var sprites = Resources.FindObjectsOfTypeAll<Sprite>();
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                var s = sprites[i];
+                if (s == null)
+                    continue;
+                string key = s.name.ToLowerInvariant();
+                if (!lookup.ContainsKey(key))
+                    lookup.Add(key, s);
+            }
+            return lookup;
+        }
+
+        private Sprite GetSpriteByName(string name)
+        {
+            if (spriteLookup == null)
+                return null;
+            spriteLookup.TryGetValue(name.ToLowerInvariant(), out var sprite);
+            return sprite;
+        }
+
+        private void UpdateHeroAnimation()
+        {
+            if (headSets == null || legsSets == null || torsoSets == null)
+                return;
+            if (currentHeroIndex < 0 || currentHeroIndex >= headSets.Length)
+                return;
+
+            bool isMoving = moveInput.sqrMagnitude > 0.0001f;
+            int frameIndex = 0; // idle
+
+            if (isMoving)
+            {
+                runTimerSeconds += Time.deltaTime;
+                float cycle = Mathf.Max(0.01f, runCycleDurationSeconds);
+                float t = runTimerSeconds % cycle;
+                bool firstHalf = t < (cycle * 0.5f);
+
+                // requested behavior: left/down use left frames, right/up use right frames
+                bool useLeftFrames = moveInput.x < -0.01f || (Mathf.Abs(moveInput.x) <= 0.01f && moveInput.y < -0.01f);
+                if (useLeftFrames)
+                    frameIndex = firstHalf ? 3 : 4;
+                else
+                    frameIndex = firstHalf ? 1 : 2;
+            }
+            else
+            {
+                runTimerSeconds = 0f;
+            }
+
+            ApplyCurrentHeroFrame(frameIndex);
+        }
+
+        private void ApplyCurrentHeroFrame(int frameIndex)
+        {
+            if (currentHeroIndex < 0 || headSets == null || currentHeroIndex >= headSets.Length)
+                return;
+
+            SetRendererFrame(headRenderer, headSets[currentHeroIndex], frameIndex);
+            SetRendererFrame(legsRenderer, legsSets[currentHeroIndex], frameIndex);
+            SetRendererFrame(torsoRenderer, torsoSets[currentHeroIndex], frameIndex);
+        }
+
+        private void SetRendererFrame(SpriteRenderer sr, Sprite[] frames, int frameIndex)
+        {
+            if (sr == null || frames == null || frameIndex < 0 || frameIndex >= frames.Length)
+                return;
+            if (frames[frameIndex] != null)
+                sr.sprite = frames[frameIndex];
+        }
+
+        private void CycleToNextHero()
+        {
+            int count = Mathf.Max(1, heroCount);
+            currentHeroIndex = (currentHeroIndex + 1) % count;
+            runTimerSeconds = 0f;
+            ApplyCurrentHeroFrame(0);
         }
 
         private void UpdateHeroOcclusionSorting()

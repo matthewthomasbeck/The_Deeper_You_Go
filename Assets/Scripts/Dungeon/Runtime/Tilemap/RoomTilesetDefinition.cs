@@ -165,7 +165,8 @@ namespace Dungeon
             if (tile == null)
                 return false;
 
-            return tile == wallTopCap
+            return tile == wallTop
+                   || tile == wallTopCap
                    || tile == wallBottom
                    || tile == wallLeft
                    || tile == wallRight
