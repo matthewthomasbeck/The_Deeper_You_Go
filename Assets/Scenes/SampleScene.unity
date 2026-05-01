@@ -585,7 +585,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2900cb0ccb6e64e4a8d15488d310d526, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  moveSpeedUnitsPerSecond: 5
+  moveSpeedUnitsPerSecond: 3.75
   openInteractableRangeTiles: 2
   worldCamera: {fileID: 330585545}
   itemActionSystem: {fileID: 0}
@@ -945,8 +945,8 @@ MonoBehaviour:
   createDecorationTilemapIfMissing: 1
   buildRuntimeLighting: 1
   runtimeLightIntensity: 0.9
-  runtimeLightInnerRadius: 0.5
-  runtimeLightOuterRadius: 3.5
+  runtimeLightInnerRadius: 1
+  runtimeLightOuterRadius: 7
   runtimeLightShadowIntensity: 0.85
   runtimeLightColor: {r: 1, g: 1, b: 1, a: 1}
   originCell: {x: 0, y: 0, z: 0}

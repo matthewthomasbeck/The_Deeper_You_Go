@@ -29,7 +29,7 @@ namespace Dungeon
         public SpriteRenderer legsRenderer;
         public SpriteRenderer torsoRenderer;
         public int heroBaseSortingOrder = 200;
-        public int heroOccludedSortingOrder = 9;
+        public int heroOccludedSortingOrder = 7;
         public bool keepCameraCenteredOnHero = true;
         public Tilemap dungeonTilemap;
         public RoomTilesetDefinition roomTileset;
@@ -40,8 +40,8 @@ namespace Dungeon
         public Image heroSelectionIconImage;
         public int heroCount = 5;
         public bool lockHeroButtonToTopLeft = true;
-        public Vector2 heroButtonOffset = new Vector2(155f, -183f);
-        public float heroButtonSize = 56f;
+        public Vector2 heroButtonOffset = new Vector2(155f, -83f);
+        public float heroButtonSize = 32f;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -414,7 +414,7 @@ namespace Dungeon
             rt.anchorMax = new Vector2(0f, 1f);
             rt.pivot = new Vector2(0f, 1f);
             // Force exact position regardless of serialized inspector overrides.
-            rt.anchoredPosition = new Vector2(155f, -83f);
+            rt.anchoredPosition = new Vector2(310f, -216f);
             rt.sizeDelta = new Vector2(32f, 32f);
             rt.localScale = Vector3.one;
             rt.localRotation = Quaternion.identity;
@@ -425,6 +425,8 @@ namespace Dungeon
             if (heroCycleButton == null)
             {
                 var go = GameObject.Find("HeroCycleButton");
+                if (go == null)
+                    go = GameObject.Find("CycleHeroButton");
                 if (go != null)
                     heroCycleButton = go.GetComponent<Button>();
             }

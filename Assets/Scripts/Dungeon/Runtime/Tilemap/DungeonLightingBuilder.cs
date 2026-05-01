@@ -98,8 +98,8 @@ namespace Dungeon
                     var light = lightGo.AddComponent<Light2D>();
                     light.lightType = Light2D.LightType.Point;
                     light.intensity = intensity;
-                    light.pointLightInnerRadius = Mathf.Max(0f, innerRadius);
-                    light.pointLightOuterRadius = Mathf.Max(light.pointLightInnerRadius, outerRadius);
+                    light.pointLightInnerRadius = Mathf.Max(0f, innerRadius * 2f);
+                    light.pointLightOuterRadius = Mathf.Max(light.pointLightInnerRadius, outerRadius * 2f);
                     light.shadowIntensity = Mathf.Clamp01(shadowIntensity);
                     light.color = lightColor;
                 }

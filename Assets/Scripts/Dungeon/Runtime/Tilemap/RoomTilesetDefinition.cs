@@ -171,6 +171,8 @@ namespace Dungeon
                    || tile == wallLeft
                    || tile == wallRight
                    || tile == wallCorner
+                   || tile == hallwayBreachEastLower
+                   || tile == hallwayBreachWestLower
                    || tile == hallwayBreachEastUpperCap
                    || tile == hallwayBreachWestUpperCap
                    || tile == columnSmallBase;
