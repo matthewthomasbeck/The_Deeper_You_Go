@@ -125,7 +125,7 @@ namespace Dungeon
             var tilemapCollider = blockerRoot.GetComponent<TilemapCollider2D>();
             if (tilemapCollider == null)
                 tilemapCollider = blockerRoot.gameObject.AddComponent<TilemapCollider2D>();
-            tilemapCollider.usedByComposite = true;
+            tilemapCollider.compositeOperation = Collider2D.CompositeOperation.Merge;
 
             var composite = blockerRoot.GetComponent<CompositeCollider2D>();
             if (composite == null)

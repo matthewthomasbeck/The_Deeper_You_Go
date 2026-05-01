@@ -590,6 +590,19 @@ MonoBehaviour:
   worldCamera: {fileID: 330585545}
   itemActionSystem: {fileID: 0}
   interactableInventoryUI: {fileID: 0}
+  headRenderer: {fileID: 0}
+  legsRenderer: {fileID: 0}
+  torsoRenderer: {fileID: 0}
+  heroBaseSortingOrder: 200
+  heroOccludedSortingOrder: 9
+  keepCameraCenteredOnHero: 1
+  dungeonTilemap: {fileID: 0}
+  roomTileset: {fileID: 11400000, guid: 89065bbef319b4602927b7e822b99cee, type: 2}
+  runCycleDurationSeconds: 1
+  showHeroSelectionBar: 1
+  heroBarPosition: {x: 12, y: 12}
+  heroBarSize: 56
+  heroCount: 5
   heldItem: {fileID: 0}
 --- !u!50 &829975135
 Rigidbody2D:

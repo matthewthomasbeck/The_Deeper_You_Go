@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -55,6 +56,11 @@ namespace Dungeon
         [Tooltip("Extra margin around the dungeon when framing (fraction of half-extent).")]
         [Range(0f, 0.5f)]
         public float cameraFitPadding = 0.06f;
+
+        [Header("Player Spawn")]
+        [Tooltip("Move the Player into a room tile after each generation.")]
+        public bool spawnPlayerInRoomOnGenerate = true;
+        public string playerObjectName = "Player";
 
 #if UNITY_EDITOR
         private void OnValidate()
@@ -159,6 +165,7 @@ namespace Dungeon
                     runtimeLightColor);
             }
 
+            SpawnPlayerInRoom(floorGrid);
             FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 
             if (verboseLogs)
@@ -236,6 +243,46 @@ namespace Dungeon
                 baseOrder = baseR.sortingOrder;
             decTr.sortingOrder = baseOrder + 1;
             decorationTilemap = decTm;
+        }
+
+        private void SpawnPlayerInRoom(RoomGrid floorGrid)
+        {
+            if (!spawnPlayerInRoomOnGenerate || floorGrid == null || tilemap == null)
+                return;
+
+            var playerGo = GameObject.Find(playerObjectName);
+            if (playerGo == null)
+                return;
+
+            var interiorCandidates = new List<Vector3Int>();
+            var roomCandidates = new List<Vector3Int>();
+            for (int y = 0; y < floorGrid.height; y++)
+            {
+                for (int x = 0; x < floorGrid.width; x++)
+                {
+                    if (floorGrid.Get(x, y) != RoomTileKind.FloorWood)
+                        continue;
+
+                    var cell = new Vector3Int(originCell.x + x, originCell.y + y, originCell.z);
+                    roomCandidates.Add(cell);
+
+                    bool interior =
+                        floorGrid.Get(x - 1, y) == RoomTileKind.FloorWood &&
+                        floorGrid.Get(x + 1, y) == RoomTileKind.FloorWood &&
+                        floorGrid.Get(x, y - 1) == RoomTileKind.FloorWood &&
+                        floorGrid.Get(x, y + 1) == RoomTileKind.FloorWood;
+                    if (interior)
+                        interiorCandidates.Add(cell);
+                }
+            }
+
+            var candidates = interiorCandidates.Count > 0 ? interiorCandidates : roomCandidates;
+            if (candidates.Count == 0)
+                return;
+
+            var chosen = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            Vector3 world = tilemap.GetCellCenterWorld(chosen);
+            playerGo.transform.position = new Vector3(world.x, world.y, playerGo.transform.position.z);
         }
     }
 }

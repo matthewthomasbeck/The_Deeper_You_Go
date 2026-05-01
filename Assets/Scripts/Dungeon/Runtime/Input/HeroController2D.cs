@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
+using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -32,10 +33,12 @@ namespace Dungeon
         public float runCycleDurationSeconds = 1f;
 
         [Header("Hero Selection UI")]
-        public bool showHeroSelectionBar = true;
-        public Vector2 heroBarPosition = new Vector2(12f, 12f);
-        public float heroBarSize = 56f;
+        public Button heroCycleButton;
+        public Image heroSelectionIconImage;
         public int heroCount = 5;
+        public bool lockHeroButtonToTopLeft = true;
+        public Vector2 heroButtonOffset = new Vector2(155f, -183f);
+        public float heroButtonSize = 56f;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -67,6 +70,7 @@ namespace Dungeon
             AutoResolveDungeonReferences();
             EnsureHeroVisibleOnTop();
             LoadHeroSpriteSets();
+            BindSceneAuthoredUI();
             ApplyCurrentHeroFrame(0);
         }
 
@@ -91,6 +95,7 @@ namespace Dungeon
         private void LateUpdate()
         {
             UpdateHeroOcclusionSorting();
+            EnforceHeroButtonLayout();
 
             if (!keepCameraCenteredOnHero || worldCamera == null)
                 return;
@@ -98,43 +103,6 @@ namespace Dungeon
             Vector3 camPos = worldCamera.transform.position;
             worldCamera.transform.position = new Vector3(transform.position.x, transform.position.y, camPos.z);
         }
-
-        private void OnGUI()
-        {
-            if (!showHeroSelectionBar || headSets == null || currentHeroIndex < 0 || currentHeroIndex >= headSets.Length)
-                return;
-
-            var icon = headSets[currentHeroIndex] != null && headSets[currentHeroIndex].Length > 0
-                ? headSets[currentHeroIndex][0]
-                : null;
-            if (icon == null || icon.texture == null)
-                return;
-
-            float x = heroBarPosition.x;
-            float y = heroBarPosition.y;
-            float size = Mathf.Max(24f, heroBarSize);
-            Rect barRect = new Rect(x, y, size, size);
-            Rect iconRect = new Rect(x + 6f, y + 6f, size - 12f, size - 12f);
-
-            Color old = GUI.color;
-            GUI.color = new Color(0f, 0f, 0f, 0.65f);
-            GUI.Box(barRect, GUIContent.none);
-            GUI.color = Color.white;
-
-            Rect texCoords = new Rect(
-                icon.textureRect.x / icon.texture.width,
-                icon.textureRect.y / icon.texture.height,
-                icon.textureRect.width / icon.texture.width,
-                icon.textureRect.height / icon.texture.height);
-            GUI.DrawTextureWithTexCoords(iconRect, icon.texture, texCoords, true);
-
-            if (GUI.Button(barRect, GUIContent.none, GUIStyle.none))
-                CycleToNextHero();
-
-            GUI.color = old;
-        }
-
-
 
 /********** INPUT **********/
 
@@ -396,12 +364,63 @@ namespace Dungeon
                 sr.sprite = frames[frameIndex];
         }
 
-        private void CycleToNextHero()
+        public void CycleToNextHero()
         {
             int count = Mathf.Max(1, heroCount);
             currentHeroIndex = (currentHeroIndex + 1) % count;
             runTimerSeconds = 0f;
             ApplyCurrentHeroFrame(0);
+            UpdateHeroSelectionIcon();
+        }
+
+        private void EnforceHeroButtonLayout()
+        {
+            if (!lockHeroButtonToTopLeft || heroCycleButton == null)
+                return;
+
+            var rt = heroCycleButton.GetComponent<RectTransform>();
+            if (rt == null)
+                return;
+
+            rt.anchorMin = new Vector2(0f, 1f);
+            rt.anchorMax = new Vector2(0f, 1f);
+            rt.pivot = new Vector2(0f, 1f);
+            // Force exact position regardless of serialized inspector overrides.
+            rt.anchoredPosition = new Vector2(155f, -83f);
+            rt.sizeDelta = new Vector2(32f, 32f);
+            rt.localScale = Vector3.one;
+            rt.localRotation = Quaternion.identity;
+        }
+
+        private void BindSceneAuthoredUI()
+        {
+            if (heroCycleButton == null)
+            {
+                var go = GameObject.Find("HeroCycleButton");
+                if (go != null)
+                    heroCycleButton = go.GetComponent<Button>();
+            }
+            if (heroSelectionIconImage == null && heroCycleButton != null)
+                heroSelectionIconImage = heroCycleButton.GetComponentInChildren<Image>(true);
+
+            if (heroCycleButton != null)
+            {
+                heroCycleButton.onClick.RemoveListener(CycleToNextHero);
+                heroCycleButton.onClick.AddListener(CycleToNextHero);
+            }
+
+            UpdateHeroSelectionIcon();
+        }
+
+        private void UpdateHeroSelectionIcon()
+        {
+            if (heroSelectionIconImage == null || headSets == null || currentHeroIndex < 0 || currentHeroIndex >= headSets.Length)
+                return;
+
+            var icon = headSets[currentHeroIndex] != null && headSets[currentHeroIndex].Length > 0
+                ? headSets[currentHeroIndex][0]
+                : null;
+            heroSelectionIconImage.sprite = icon;
         }
 
         private void UpdateHeroOcclusionSorting()
