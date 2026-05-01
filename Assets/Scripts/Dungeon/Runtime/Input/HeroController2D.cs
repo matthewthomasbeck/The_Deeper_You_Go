@@ -5,6 +5,9 @@ using UnityEngine.UI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace Dungeon
 {
@@ -52,6 +55,7 @@ namespace Dungeon
         private Sprite[][] legsSets;
         private Sprite[][] torsoSets;
         private Dictionary<string, Sprite> spriteLookup;
+        private bool heroButtonBound;
 
 
 
@@ -74,11 +78,20 @@ namespace Dungeon
             ApplyCurrentHeroFrame(0);
         }
 
+        private void Start()
+        {
+            // Rebind after all scene objects finish Awake.
+            BindSceneAuthoredUI();
+        }
+
 
 /***** read input for movement and clicks *****/
 
         private void Update()
         {
+            if (!heroButtonBound)
+                BindSceneAuthoredUI();
+
             ReadMoveInput();
             UpdateHeroAnimation();
             HandleMouseInput();
@@ -293,6 +306,21 @@ namespace Dungeon
         private Dictionary<string, Sprite> BuildSpriteLookup()
         {
             var lookup = new Dictionary<string, Sprite>();
+
+#if UNITY_EDITOR
+            // Prefer loading all sprite sub-assets directly from the heroes sheet in editor.
+            const string heroesSheetPath = "Assets/Art/Heroes/heroes.png";
+            var subAssets = AssetDatabase.LoadAllAssetRepresentationsAtPath(heroesSheetPath);
+            for (int i = 0; i < subAssets.Length; i++)
+            {
+                if (subAssets[i] is not Sprite s)
+                    continue;
+                string key = s.name.ToLowerInvariant();
+                if (!lookup.ContainsKey(key))
+                    lookup.Add(key, s);
+            }
+#endif
+
             var sprites = Resources.FindObjectsOfTypeAll<Sprite>();
             for (int i = 0; i < sprites.Length; i++)
             {
@@ -401,13 +429,23 @@ namespace Dungeon
                     heroCycleButton = go.GetComponent<Button>();
             }
             if (heroSelectionIconImage == null && heroCycleButton != null)
-                heroSelectionIconImage = heroCycleButton.GetComponentInChildren<Image>(true);
+            {
+                var iconTf = heroCycleButton.transform.Find("HeroIcon");
+                if (iconTf != null)
+                    heroSelectionIconImage = iconTf.GetComponent<Image>();
+                if (heroSelectionIconImage == null)
+                    heroSelectionIconImage = heroCycleButton.GetComponentInChildren<Image>(true);
+            }
 
             if (heroCycleButton != null)
             {
                 heroCycleButton.onClick.RemoveListener(CycleToNextHero);
                 heroCycleButton.onClick.AddListener(CycleToNextHero);
+                heroButtonBound = true;
             }
+
+            if (heroSelectionIconImage != null)
+                heroSelectionIconImage.preserveAspect = true;
 
             UpdateHeroSelectionIcon();
         }
@@ -420,7 +458,8 @@ namespace Dungeon
             var icon = headSets[currentHeroIndex] != null && headSets[currentHeroIndex].Length > 0
                 ? headSets[currentHeroIndex][0]
                 : null;
-            heroSelectionIconImage.sprite = icon;
+            if (icon != null)
+                heroSelectionIconImage.sprite = icon;
         }
 
         private void UpdateHeroOcclusionSorting()
