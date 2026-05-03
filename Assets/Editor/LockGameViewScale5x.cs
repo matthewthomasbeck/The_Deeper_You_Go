@@ -7,42 +7,44 @@ using UnityEngine;
 namespace Dungeon.EditorTools
 {
     /// <summary>
-    /// Forces Unity Game view zoom to 5x in the editor.
-    /// Editor-only convenience helper (does not affect builds).
+    /// Optionally sets Game view zoom to 5x. Runs only from the menu or once shortly after entering Play Mode.
+    /// Does not poll every editor frame — that previously called GetWindow() forever when reflection failed and broke the Inspector.
     /// </summary>
-    [InitializeOnLoad]
     public static class LockGameViewScale5x
     {
         private const float TargetScale = 5f;
-        private static bool pendingApply = true;
 
-        static LockGameViewScale5x()
+        [InitializeOnLoadMethod]
+        private static void RegisterPlayModeHook()
         {
-            EditorApplication.update += OnEditorUpdate;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
         }
 
         [MenuItem("Tools/UI/Force Game View Scale 5x")]
         public static void ForceNow()
         {
-            pendingApply = true;
-            TryApplyScale();
+            ApplyScale(scheduleDelay: false, focusGameView: true);
         }
 
-        private static void OnPlayModeStateChanged(PlayModeStateChange _)
+        private static void OnPlayModeStateChanged(PlayModeStateChange state)
         {
-            pendingApply = true;
-        }
-
-        private static void OnEditorUpdate()
-        {
-            if (!pendingApply)
+            if (state != PlayModeStateChange.EnteredPlayMode)
                 return;
-
-            TryApplyScale();
+            ApplyScale(scheduleDelay: true, focusGameView: false);
         }
 
-        private static void TryApplyScale()
+        private static void ApplyScale(bool scheduleDelay, bool focusGameView)
+        {
+            if (scheduleDelay)
+            {
+                EditorApplication.delayCall += () => TryApplyScale(focusGameView);
+                return;
+            }
+
+            TryApplyScale(focusGameView);
+        }
+
+        private static void TryApplyScale(bool focusGameView)
         {
             try
             {
@@ -50,11 +52,10 @@ namespace Dungeon.EditorTools
                 if (gameViewType == null)
                     return;
 
-                var gameView = EditorWindow.GetWindow(gameViewType);
+                var gameView = GetGameViewWindow(gameViewType, focusGameView);
                 if (gameView == null)
                     return;
 
-                // Internal field in GameView that holds zoom data.
                 var zoomAreaField = gameViewType.GetField("m_ZoomArea", BindingFlags.Instance | BindingFlags.NonPublic);
                 if (zoomAreaField == null)
                     return;
@@ -70,13 +71,28 @@ namespace Dungeon.EditorTools
 
                 scaleProp.SetValue(zoomArea, new Vector2(TargetScale, TargetScale), null);
                 gameView.Repaint();
-                pendingApply = false;
             }
             catch
             {
-                // Keep editor stable if Unity internals change.
-                pendingApply = false;
+                // Unity internals vary by version — fail quietly.
             }
+        }
+
+        private static EditorWindow GetGameViewWindow(Type gameViewType, bool focus)
+        {
+            try
+            {
+                var gm = typeof(EditorWindow).GetMethod("GetWindow", BindingFlags.Public | BindingFlags.Static, null,
+                    new[] { typeof(Type), typeof(bool), typeof(string), typeof(bool) }, null);
+                if (gm != null)
+                    return (EditorWindow)gm.Invoke(null, new object[] { gameViewType, false, (string)null, focus });
+            }
+            catch
+            {
+                // Fall through to two-arg overload.
+            }
+
+            return EditorWindow.GetWindow(gameViewType);
         }
     }
 }

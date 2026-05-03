@@ -94,7 +94,7 @@ namespace Dungeon
             RoomTilesetDefinition tileset,
             RoomGrid floorGrid)
         {
-            DetailRoomStructure(tilemap, origin, tileset, floorGrid, null);
+            DetailRoomStructure(tilemap, origin, tileset, floorGrid, null, null);
         }
 
         /// <param name="decorationTilemap">Overlay for lights, props, chests / benches.</param>
@@ -104,6 +104,19 @@ namespace Dungeon
             RoomTilesetDefinition tileset,
             RoomGrid floorGrid,
             Tilemap decorationTilemap)
+        {
+            DetailRoomStructure(tilemap, origin, tileset, floorGrid, decorationTilemap, null);
+        }
+
+        /// <param name="decorationTilemap">Overlay for lights, props, chests / benches.</param>
+        /// <param name="enemyIdleSprites">Optional idle sprites for per-room-band enemy placement.</param>
+        public static void DetailRoomStructure(
+            Tilemap tilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            RoomGrid floorGrid,
+            Tilemap decorationTilemap,
+            DungeonEnemyIdleSprites enemyIdleSprites)
         {
             if (tilemap == null || tileset == null || floorGrid == null)
                 return;
@@ -142,7 +155,7 @@ namespace Dungeon
                 if (areas[i] < smallThreshold)
                 {
                     DetailSmallRooms(tilemap, origin, tileset, components[i]);
-                    DecorateSmallRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, components[i]);
+                    DecorateSmallRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, components[i], enemyIdleSprites);
                 }
             }
 
@@ -159,14 +172,14 @@ namespace Dungeon
                 else
                 {
                     DetailMediumRoom(tilemap, origin, tileset, components[i]);
-                    DecorateNormalMediumRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, components[i]);
+                    DecorateNormalMediumRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, components[i], enemyIdleSprites);
                 }
             }
 
             for (int i = 0; i < components.Count; i++)
             {
                 if (areas[i] > largeThreshold)
-                    DetailLargeRoom(tilemap, origin, tileset, components[i], i == bossIndex, decorationTilemap, floorGrid);
+                    DetailLargeRoom(tilemap, origin, tileset, components[i], i == bossIndex, decorationTilemap, floorGrid, enemyIdleSprites);
             }
 
             tilemap.RefreshAllTiles();
@@ -294,7 +307,8 @@ namespace Dungeon
             HashSet<Vector2Int> roomCells,
             bool isBossRoom = false,
             Tilemap decorationTilemap = null,
-            RoomGrid floorGrid = null)
+            RoomGrid floorGrid = null,
+            DungeonEnemyIdleSprites enemyIdleSprites = null)
         {
             if (!HasAllRugTiles(tileset) || tileset.floorWood == null)
                 return;
@@ -323,7 +337,7 @@ namespace Dungeon
                 if (isBossRoom)
                     DecorateBossRoom(tilemap, origin, tileset, roomCells);
                 else
-                    DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells);
+                    DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells, enemyIdleSprites);
                 return;
             }
 
@@ -354,7 +368,7 @@ namespace Dungeon
             if (isBossRoom)
                 DecorateBossRoom(tilemap, origin, tileset, roomCells);
             else
-                DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells);
+                DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells, enemyIdleSprites);
         }
 
         /// <summary>Columns, overlay light (rooms_41), 10% furnish (rooms_34), 10% rare chest (rooms_37) only.</summary>
@@ -364,7 +378,8 @@ namespace Dungeon
             Vector3Int origin,
             RoomTilesetDefinition tileset,
             RoomGrid floorGrid,
-            HashSet<Vector2Int> roomCells)
+            HashSet<Vector2Int> roomCells,
+            DungeonEnemyIdleSprites enemyIdleSprites = null)
         {
             var style = ColumnStampStyle.SmallRoom(tileset);
             BuildRoomColumns(
@@ -387,6 +402,16 @@ namespace Dungeon
                 rareChest: tileset.chestSmallMediumRegular,
                 rareChance: 0.1f,
                 style);
+            RoomEnemySpawner.SpawnStillEnemiesInRoom(
+                tilemap,
+                decorationTilemap,
+                origin,
+                tileset,
+                roomCells,
+                style,
+                enemyIdleSprites,
+                DungeonEnemyRoomBand.Small,
+                RoomEnemySpawner.DefaultEnemiesPerRoom);
         }
 
         /// <summary>Columns, light rooms_41, 30% furnish rooms_28–33, chests 37 / 38.</summary>
@@ -396,7 +421,8 @@ namespace Dungeon
             Vector3Int origin,
             RoomTilesetDefinition tileset,
             RoomGrid floorGrid,
-            HashSet<Vector2Int> roomCells)
+            HashSet<Vector2Int> roomCells,
+            DungeonEnemyIdleSprites enemyIdleSprites = null)
         {
             var style = ColumnStampStyle.MediumRoom(tileset);
             BuildRoomColumns(
@@ -420,6 +446,16 @@ namespace Dungeon
                 0.1f,
                 style,
                 guaranteeOneChest: true);
+            RoomEnemySpawner.SpawnStillEnemiesInRoom(
+                tilemap,
+                decorationTilemap,
+                origin,
+                tileset,
+                roomCells,
+                style,
+                enemyIdleSprites,
+                DungeonEnemyRoomBand.Medium,
+                RoomEnemySpawner.DefaultEnemiesPerRoom);
         }
 
         /// <summary>No columns; merchant rug already applied. Light rooms_40, 30% furnish 28–33, and guaranteed merchant desk (rooms_36 via chest placement).</summary>
@@ -454,7 +490,8 @@ namespace Dungeon
             Vector3Int origin,
             RoomTilesetDefinition tileset,
             RoomGrid floorGrid,
-            HashSet<Vector2Int> roomCells)
+            HashSet<Vector2Int> roomCells,
+            DungeonEnemyIdleSprites enemyIdleSprites = null)
         {
             var style = ColumnStampStyle.LargeRoom(tileset);
             BuildRoomColumns(
@@ -478,6 +515,16 @@ namespace Dungeon
                 0.1f,
                 style,
                 guaranteeOneChest: true);
+            RoomEnemySpawner.SpawnStillEnemiesInRoom(
+                tilemap,
+                decorationTilemap,
+                origin,
+                tileset,
+                roomCells,
+                style,
+                enemyIdleSprites,
+                DungeonEnemyRoomBand.Large,
+                RoomEnemySpawner.DefaultEnemiesPerRoom);
         }
 
         /// <summary>Breach + column shafts use <see cref="RoomTilesetDefinition.illuminationB"/> (rooms_41).</summary>
@@ -1755,7 +1802,7 @@ namespace Dungeon
             foreach (var p in roomCells)
             {
                 var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
-                if (!IsChestFloorCell(baseTilemap, cell, tileset, colStyle))
+                if (!IsWalkableFloorForChestOrEnemy(baseTilemap, cell, tileset, colStyle))
                     continue;
                 if (decorationTilemap.GetTile(cell) != null)
                     continue;
@@ -1769,7 +1816,7 @@ namespace Dungeon
             decorationTilemap.SetTile(new Vector3Int(origin.x + pick.x, origin.y + pick.y, z), chosen);
         }
 
-        private static bool IsChestFloorCell(Tilemap map, Vector3Int cell, RoomTilesetDefinition t, ColumnStampStyle columnStyle)
+        public static bool IsWalkableFloorForChestOrEnemy(Tilemap map, Vector3Int cell, RoomTilesetDefinition t, ColumnStampStyle columnStyle)
         {
             var tile = map.GetTile(cell);
             if (tile == null)

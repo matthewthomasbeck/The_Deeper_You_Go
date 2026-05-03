@@ -39,9 +39,6 @@ namespace Dungeon
         public Button heroCycleButton;
         public Image heroSelectionIconImage;
         public int heroCount = 5;
-        public bool lockHeroButtonToTopLeft = true;
-        public Vector2 heroButtonOffset = new Vector2(155f, -83f);
-        public float heroButtonSize = 32f;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -108,7 +105,6 @@ namespace Dungeon
         private void LateUpdate()
         {
             UpdateHeroOcclusionSorting();
-            EnforceHeroButtonLayout();
 
             if (!keepCameraCenteredOnHero || worldCamera == null)
                 return;
@@ -399,25 +395,6 @@ namespace Dungeon
             runTimerSeconds = 0f;
             ApplyCurrentHeroFrame(0);
             UpdateHeroSelectionIcon();
-        }
-
-        private void EnforceHeroButtonLayout()
-        {
-            if (!lockHeroButtonToTopLeft || heroCycleButton == null)
-                return;
-
-            var rt = heroCycleButton.GetComponent<RectTransform>();
-            if (rt == null)
-                return;
-
-            rt.anchorMin = new Vector2(0f, 1f);
-            rt.anchorMax = new Vector2(0f, 1f);
-            rt.pivot = new Vector2(0f, 1f);
-            // Force exact position regardless of serialized inspector overrides.
-            rt.anchoredPosition = new Vector2(310f, -216f);
-            rt.sizeDelta = new Vector2(32f, 32f);
-            rt.localScale = Vector3.one;
-            rt.localRotation = Quaternion.identity;
         }
 
         private void BindSceneAuthoredUI()

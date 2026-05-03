@@ -107,6 +107,14 @@ namespace Dungeon
             }
         }
 
+        /// <summary>Sets max health and refills current health (runtime enemy tuning).</summary>
+        public void SetCombatMaxHealth(int newMaxHealth)
+        {
+            newMaxHealth = Mathf.Max(1, newMaxHealth);
+            maxHealth = newMaxHealth;
+            Health = maxHealth;
+        }
+
 
 /***** tick over-time and timed status effects *****/
 

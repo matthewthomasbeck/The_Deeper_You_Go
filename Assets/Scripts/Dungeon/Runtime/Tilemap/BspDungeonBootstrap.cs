@@ -41,6 +41,9 @@ namespace Dungeon
 
         public BspDungeonParameters parameters = new BspDungeonParameters();
 
+        /// <summary> Valid after <see cref="Generate"/> completes; used by enemies for grid pathfinding. </summary>
+        public RoomGrid LastGeneratedFloorGrid { get; private set; }
+
         public bool useFixedSeed;
         public int fixedSeed = 12345;
 
@@ -56,6 +59,46 @@ namespace Dungeon
         [Tooltip("Extra margin around the dungeon when framing (fraction of half-extent).")]
         [Range(0f, 0.5f)]
         public float cameraFitPadding = 0.06f;
+
+        [Header("Enemy spawn (idle sprites)")]
+        [Tooltip("Assign sliced idle sprites from vampires sheet. When empty, no enemies are spawned.")]
+        public DungeonEnemyIdleSprites enemyIdleSprites = new DungeonEnemyIdleSprites();
+
+        [Header("Thrall chase / attack sprites")]
+        [Tooltip("Shown here so you can assign without digging into the nested enemy list. Copied into spawn config when the dungeon generates.")]
+        public Sprite thrallMoveFrame1;
+        public Sprite thrallMoveFrame2;
+        public Sprite thrallAttackFrame;
+
+        [Header("Strongman chase / attack sprites")]
+        public Sprite strongmanMoveFrame1;
+        public Sprite strongmanMoveFrame2;
+        public Sprite strongmanAttackFrame;
+
+        [Header("Bat chase / attack sprites")]
+        public Sprite batMoveFrame1;
+        public Sprite batMoveFrame2;
+        public Sprite batAttackFrame;
+
+        [Header("Blood clot chase / attack sprites")]
+        public Sprite clotMoveFrame1;
+        public Sprite clotMoveFrame2;
+        public Sprite clotAttackFrame;
+
+        [Header("Knight chase / attack sprites")]
+        public Sprite knightMoveFrame1;
+        public Sprite knightMoveFrame2;
+        public Sprite knightAttackFrame;
+
+        [Header("Mage chase / attack sprites")]
+        public Sprite mageMoveFrame1;
+        public Sprite mageMoveFrame2;
+        public Sprite mageAttackFrame;
+
+        [Header("Witch chase / attack sprites")]
+        public Sprite witchMoveFrame1;
+        public Sprite witchMoveFrame2;
+        public Sprite witchAttackFrame;
 
         [Header("Player Spawn")]
         [Tooltip("Move the Player into a room tile after each generation.")]
@@ -136,6 +179,7 @@ namespace Dungeon
                 Debug.Log($"[BspDungeon] Building BSP {genW}×{genH} (effective; inspector had {parameters.mapWidth}×{parameters.mapHeight})…", this);
 
             var floorGrid = BspDungeonGenerator.Build(parameters, seed);
+            LastGeneratedFloorGrid = floorGrid;
 
             if (verboseLogs)
                 Debug.Log("[BspDungeon] Painting tilemap (base → floors → walls)…", this);
@@ -146,10 +190,21 @@ namespace Dungeon
             if (decorationTilemap != null)
                 decorationTilemap.ClearAllTiles();
 
+            RoomEnemySpawner.ClearSpawned(tilemap);
+
             BspTilemapPainter.Paint(tilemap, originCell, tileset, floorGrid);
             BspTilemapPainter.CleanUpRooms(tilemap, originCell, tileset, floorGrid);
 
-            RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid, decorationTilemap);
+            SyncEnemyAnimationSpritesIntoConfig();
+            var idles = enemyIdleSprites != null && enemyIdleSprites.HasAnySprite() ? enemyIdleSprites : null;
+            if (idles == null)
+            {
+                Debug.LogWarning(
+                    "[BspDungeon] No enemy idle sprites configured (enemyIdleSprites empty / scene lost refs). Assign idle sprites from Art/Enemies/vampires on BspDungeon or enemies will not spawn.",
+                    this);
+            }
+
+            RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid, decorationTilemap, idles);
 
             if (buildRuntimeLighting)
             {
@@ -172,6 +227,57 @@ namespace Dungeon
                 Debug.Log(
                     $"[BspDungeon] Done. Grid cells: {floorGrid.width}×{floorGrid.height}. If the void still looks small, confirm this log matches expectations.",
                     this);
+        }
+
+        /// <summary>
+        /// Copies top-level chase/attack sprite fields into <see cref="enemyIdleSprites"/> before spawning.
+        /// </summary>
+        private void SyncEnemyAnimationSpritesIntoConfig()
+        {
+            if (enemyIdleSprites == null)
+                enemyIdleSprites = new DungeonEnemyIdleSprites();
+            if (thrallMoveFrame1 != null)
+                enemyIdleSprites.thrallMove1 = thrallMoveFrame1;
+            if (thrallMoveFrame2 != null)
+                enemyIdleSprites.thrallMove2 = thrallMoveFrame2;
+            if (thrallAttackFrame != null)
+                enemyIdleSprites.thrallAttack = thrallAttackFrame;
+            if (strongmanMoveFrame1 != null)
+                enemyIdleSprites.strongmanMove1 = strongmanMoveFrame1;
+            if (strongmanMoveFrame2 != null)
+                enemyIdleSprites.strongmanMove2 = strongmanMoveFrame2;
+            if (strongmanAttackFrame != null)
+                enemyIdleSprites.strongmanAttack = strongmanAttackFrame;
+            if (batMoveFrame1 != null)
+                enemyIdleSprites.batMove1 = batMoveFrame1;
+            if (batMoveFrame2 != null)
+                enemyIdleSprites.batMove2 = batMoveFrame2;
+            if (batAttackFrame != null)
+                enemyIdleSprites.batAttack = batAttackFrame;
+            if (clotMoveFrame1 != null)
+                enemyIdleSprites.clotMove1 = clotMoveFrame1;
+            if (clotMoveFrame2 != null)
+                enemyIdleSprites.clotMove2 = clotMoveFrame2;
+            if (clotAttackFrame != null)
+                enemyIdleSprites.clotAttack = clotAttackFrame;
+            if (knightMoveFrame1 != null)
+                enemyIdleSprites.knightMove1 = knightMoveFrame1;
+            if (knightMoveFrame2 != null)
+                enemyIdleSprites.knightMove2 = knightMoveFrame2;
+            if (knightAttackFrame != null)
+                enemyIdleSprites.knightAttack = knightAttackFrame;
+            if (mageMoveFrame1 != null)
+                enemyIdleSprites.mageMove1 = mageMoveFrame1;
+            if (mageMoveFrame2 != null)
+                enemyIdleSprites.mageMove2 = mageMoveFrame2;
+            if (mageAttackFrame != null)
+                enemyIdleSprites.mageAttack = mageAttackFrame;
+            if (witchMoveFrame1 != null)
+                enemyIdleSprites.witchMove1 = witchMoveFrame1;
+            if (witchMoveFrame2 != null)
+                enemyIdleSprites.witchMove2 = witchMoveFrame2;
+            if (witchAttackFrame != null)
+                enemyIdleSprites.witchAttack = witchAttackFrame;
         }
 
         private void FrameMainCameraOnDungeon(int gridW, int gridH)

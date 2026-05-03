@@ -602,9 +602,6 @@ MonoBehaviour:
   heroCycleButton: {fileID: 1900000014}
   heroSelectionIconImage: {fileID: 1900000023}
   heroCount: 5
-  lockHeroButtonToTopLeft: 1
-  heroButtonOffset: {x: 155, y: -83}
-  heroButtonSize: 32
   heldItem: {fileID: 0}
 --- !u!50 &829975135
 Rigidbody2D:
@@ -974,6 +971,58 @@ MonoBehaviour:
   verboseLogs: 1
   frameMainCameraOnDungeon: 0
   cameraFitPadding: 0.06
+  enemyIdleSprites:
+    batIdle: {fileID: -425140964, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    clotIdle: {fileID: 1430730781, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    thrallIdle: {fileID: 1700425825, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    witchIdle: {fileID: 1284266919, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    strongmanIdle: {fileID: 514349409, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    knightIdle: {fileID: 1777816507, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    mageIdle: {fileID: 2137444902, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    thrallMove1: {fileID: 1907110453, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    thrallMove2: {fileID: 991925524, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    thrallAttack: {fileID: 875114487, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    strongmanMove1: {fileID: 1270915754, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    strongmanMove2: {fileID: 635236953, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    strongmanAttack: {fileID: -1949773760, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    batMove1: {fileID: 408902169, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    batMove2: {fileID: 0}
+    batAttack: {fileID: 0}
+    clotMove1: {fileID: -729502358, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    clotMove2: {fileID: 0}
+    clotAttack: {fileID: 0}
+    knightMove1: {fileID: 144921869, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    knightMove2: {fileID: -1373216209, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    knightAttack: {fileID: 51757778, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    mageMove1: {fileID: 683028823, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    mageMove2: {fileID: 1102917366, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    mageAttack: {fileID: 951920173, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    witchMove1: {fileID: -706294516, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    witchMove2: {fileID: -1838176409, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+    witchAttack: {fileID: 1885959703, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  thrallMoveFrame1: {fileID: 1907110453, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  thrallMoveFrame2: {fileID: 991925524, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  thrallAttackFrame: {fileID: 875114487, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  strongmanMoveFrame1: {fileID: 1270915754, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  strongmanMoveFrame2: {fileID: 635236953, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  strongmanAttackFrame: {fileID: -1949773760, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  batMoveFrame1: {fileID: 408902169, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  batMoveFrame2: {fileID: 0}
+  batAttackFrame: {fileID: 0}
+  clotMoveFrame1: {fileID: -729502358, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  clotMoveFrame2: {fileID: 0}
+  clotAttackFrame: {fileID: 0}
+  knightMoveFrame1: {fileID: 144921869, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  knightMoveFrame2: {fileID: -1373216209, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  knightAttackFrame: {fileID: 51757778, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  mageMoveFrame1: {fileID: 683028823, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  mageMoveFrame2: {fileID: 1102917366, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  mageAttackFrame: {fileID: 951920173, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  witchMoveFrame1: {fileID: -706294516, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  witchMoveFrame2: {fileID: -1838176409, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  witchAttackFrame: {fileID: 1885959703, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
+  spawnPlayerInRoomOnGenerate: 1
+  playerObjectName: Player
 --- !u!1 &1900000000
 GameObject:
   m_ObjectHideFlags: 0
