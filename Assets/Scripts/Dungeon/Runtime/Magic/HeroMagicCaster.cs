@@ -46,6 +46,12 @@ namespace Dungeon.Magic
                 worldCamera = Camera.main;
 
             EnsureAimVisual();
+#if UNITY_EDITOR
+            // important: scene serializes spells: []; fill as early as possible so other components
+            // (e.g. hero input) never see an empty list due to Start order between scripts.
+            if (autoPopulateWhenEmptyInEditor && spells.Count == 0)
+                PopulateSpellsFromMagicFolder();
+#endif
             equippedIndex = Mathf.Clamp(equippedIndex, 0, Mathf.Max(0, spells.Count - 1));
         }
 
@@ -60,6 +66,9 @@ namespace Dungeon.Magic
 
         private void Update()
         {
+            if (Dungeon.GamePauseState.IsPaused)
+                return;
+
             UpdateSpellHotkeys();
             UpdateAimVisual();
         }

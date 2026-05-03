@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
-using UnityEngine.UI;
 using Dungeon.Magic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -36,10 +35,9 @@ namespace Dungeon
         public RoomTilesetDefinition roomTileset;
         public float runCycleDurationSeconds = 1f;
 
-        [Header("Hero Selection UI")]
-        public Button heroCycleButton;
-        public Image heroSelectionIconImage;
+        [Header("Hero appearance")]
         public int heroCount = 5;
+        public int heroIndex = 0;
 
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
@@ -48,13 +46,21 @@ namespace Dungeon
         private Rigidbody2D rb;
         private Vector2 moveInput;
         private float runTimerSeconds;
-        private int currentHeroIndex = 0;
         private Sprite[][] headSets;
         private Sprite[][] legsSets;
         private Sprite[][] torsoSets;
         private Dictionary<string, Sprite> spriteLookup;
-        private bool heroButtonBound;
         private HeroMagicCaster magicCaster;
+
+        private int EffectiveHeroSpriteIndex =>
+            headSets == null || headSets.Length == 0 ? 0 : Mathf.Clamp(heroIndex, 0, headSets.Length - 1);
+
+        private void ClampHeroIndex()
+        {
+            if (headSets == null || headSets.Length == 0)
+                return;
+            heroIndex = EffectiveHeroSpriteIndex;
+        }
 
 
 
@@ -74,14 +80,8 @@ namespace Dungeon
             AutoResolveDungeonReferences();
             EnsureHeroVisibleOnTop();
             LoadHeroSpriteSets();
-            BindSceneAuthoredUI();
+            ClampHeroIndex();
             ApplyCurrentHeroFrame(0);
-        }
-
-        private void Start()
-        {
-            // Rebind after all scene objects finish Awake.
-            BindSceneAuthoredUI();
         }
 
 
@@ -89,8 +89,11 @@ namespace Dungeon
 
         private void Update()
         {
-            if (!heroButtonBound)
-                BindSceneAuthoredUI();
+            if (GamePauseState.IsPaused)
+            {
+                moveInput = Vector2.zero;
+                return;
+            }
 
             ReadMoveInput();
             UpdateHeroAnimation();
@@ -102,11 +105,20 @@ namespace Dungeon
 
         private void FixedUpdate()
         {
+            if (GamePauseState.IsPaused)
+            {
+                rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
             rb.linearVelocity = moveInput * moveSpeedUnitsPerSecond;
         }
 
         private void LateUpdate()
         {
+            if (GamePauseState.IsPaused)
+                return;
+
             UpdateHeroOcclusionSorting();
 
             if (!keepCameraCenteredOnHero || worldCamera == null)
@@ -352,8 +364,6 @@ namespace Dungeon
         {
             if (headSets == null || legsSets == null || torsoSets == null)
                 return;
-            if (currentHeroIndex < 0 || currentHeroIndex >= headSets.Length)
-                return;
 
             bool isMoving = moveInput.sqrMagnitude > 0.0001f;
             int frameIndex = 0; // idle
@@ -382,12 +392,12 @@ namespace Dungeon
 
         private void ApplyCurrentHeroFrame(int frameIndex)
         {
-            if (currentHeroIndex < 0 || headSets == null || currentHeroIndex >= headSets.Length)
+            if (headSets == null)
                 return;
-
-            SetRendererFrame(headRenderer, headSets[currentHeroIndex], frameIndex);
-            SetRendererFrame(legsRenderer, legsSets[currentHeroIndex], frameIndex);
-            SetRendererFrame(torsoRenderer, torsoSets[currentHeroIndex], frameIndex);
+            int hi = EffectiveHeroSpriteIndex;
+            SetRendererFrame(headRenderer, headSets[hi], frameIndex);
+            SetRendererFrame(legsRenderer, legsSets[hi], frameIndex);
+            SetRendererFrame(torsoRenderer, torsoSets[hi], frameIndex);
         }
 
         private void SetRendererFrame(SpriteRenderer sr, Sprite[] frames, int frameIndex)
@@ -396,59 +406,6 @@ namespace Dungeon
                 return;
             if (frames[frameIndex] != null)
                 sr.sprite = frames[frameIndex];
-        }
-
-        public void CycleToNextHero()
-        {
-            int count = Mathf.Max(1, heroCount);
-            currentHeroIndex = (currentHeroIndex + 1) % count;
-            runTimerSeconds = 0f;
-            ApplyCurrentHeroFrame(0);
-            UpdateHeroSelectionIcon();
-        }
-
-        private void BindSceneAuthoredUI()
-        {
-            if (heroCycleButton == null)
-            {
-                var go = GameObject.Find("HeroCycleButton");
-                if (go == null)
-                    go = GameObject.Find("CycleHeroButton");
-                if (go != null)
-                    heroCycleButton = go.GetComponent<Button>();
-            }
-            if (heroSelectionIconImage == null && heroCycleButton != null)
-            {
-                var iconTf = heroCycleButton.transform.Find("HeroIcon");
-                if (iconTf != null)
-                    heroSelectionIconImage = iconTf.GetComponent<Image>();
-                if (heroSelectionIconImage == null)
-                    heroSelectionIconImage = heroCycleButton.GetComponentInChildren<Image>(true);
-            }
-
-            if (heroCycleButton != null)
-            {
-                heroCycleButton.onClick.RemoveListener(CycleToNextHero);
-                heroCycleButton.onClick.AddListener(CycleToNextHero);
-                heroButtonBound = true;
-            }
-
-            if (heroSelectionIconImage != null)
-                heroSelectionIconImage.preserveAspect = true;
-
-            UpdateHeroSelectionIcon();
-        }
-
-        private void UpdateHeroSelectionIcon()
-        {
-            if (heroSelectionIconImage == null || headSets == null || currentHeroIndex < 0 || currentHeroIndex >= headSets.Length)
-                return;
-
-            var icon = headSets[currentHeroIndex] != null && headSets[currentHeroIndex].Length > 0
-                ? headSets[currentHeroIndex][0]
-                : null;
-            if (icon != null)
-                heroSelectionIconImage.sprite = icon;
         }
 
         private void UpdateHeroOcclusionSorting()
