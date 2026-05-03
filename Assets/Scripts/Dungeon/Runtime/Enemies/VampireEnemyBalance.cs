@@ -33,6 +33,20 @@ namespace Dungeon
         /// <summary>Mage stops and casts when the hero is within this Chebyshev distance (long cast band).</summary>
         public const int MageRangedHoldChebyshev = 10;
 
+        /// <summary>Ranged casters path toward a tile this far from the hero (Chebyshev min).</summary>
+        public const int CasterPathfindComfortMinChebyshev = 5;
+
+        /// <summary>Ranged casters path toward a tile at most this far from the hero (Chebyshev max).</summary>
+        public const int CasterPathfindComfortMaxChebyshev = 10;
+
+        /// <summary>Larger interval than melee reduces comfort-goal probing cost when multiple casters are active.</summary>
+        public const float CasterRepathIntervalSeconds = 0.55f;
+
+        /// <summary>
+        /// When standing on a column capital (rooms_10 / small cap), draw enemies below the tilemap trim (match hero occlusion feel).
+        /// </summary>
+        public const int EnemySpriteSortingBelowColumnCapital = 8;
+
         /// <summary>Witch and mage move at strongman speed.</summary>
         public static float WitchAndMageMoveSpeedWorldUnits => StrongmanMoveSpeedWorldUnits;
 

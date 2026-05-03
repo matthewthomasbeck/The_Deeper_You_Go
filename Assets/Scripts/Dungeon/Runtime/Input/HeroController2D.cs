@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Tilemaps;
 using System.Collections.Generic;
 using UnityEngine.UI;
+using Dungeon.Magic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -53,6 +54,7 @@ namespace Dungeon
         private Sprite[][] torsoSets;
         private Dictionary<string, Sprite> spriteLookup;
         private bool heroButtonBound;
+        private HeroMagicCaster magicCaster;
 
 
 
@@ -64,6 +66,7 @@ namespace Dungeon
         {
             hero = GetComponent<ActorBase>();
             rb = GetComponent<Rigidbody2D>();
+            magicCaster = GetComponent<HeroMagicCaster>();
 
             if (worldCamera == null)
                 worldCamera = Camera.main;
@@ -178,13 +181,9 @@ namespace Dungeon
 
         private void HandleRightClick()
         {
-            var col = GetColliderUnderMouse();
-            if (col == null)
-                return;
+            Collider2D col = GetColliderUnderMouse();
 
-            var target = ResolveTarget(col);
-            if (target == null)
-                return;
+            object target = col != null ? ResolveTarget(col) : null;
 
             // important: right click opens interactable if within range
             if (target is InteractableBase interactable && interactable.isOpenable)
@@ -199,9 +198,20 @@ namespace Dungeon
                 }
             }
 
+            if (magicCaster != null && magicCaster.TryCastToward(GetCursorWorldFlat()))
+                return;
+
             // important: otherwise right click uses held item effects
-            if (heldItem != null && itemActionSystem != null)
+            if (heldItem != null && itemActionSystem != null && col != null && target != null)
                 itemActionSystem.do_action(heldItem, target);
+        }
+
+        private Vector2 GetCursorWorldFlat()
+        {
+            var mouse = GetMouseScreenPosition();
+            float camZ = worldCamera.transform.position.z;
+            Vector3 world = worldCamera.ScreenToWorldPoint(new Vector3(mouse.x, mouse.y, Mathf.Abs(camZ)));
+            return new Vector2(world.x, world.y);
         }
 
 

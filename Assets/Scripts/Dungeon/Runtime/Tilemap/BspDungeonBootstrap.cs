@@ -213,6 +213,7 @@ namespace Dungeon
                     decorationTilemap,
                     tileset,
                     originCell,
+                    floorGrid,
                     runtimeLightIntensity,
                     runtimeLightInnerRadius,
                     runtimeLightOuterRadius,

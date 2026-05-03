@@ -52,6 +52,8 @@ namespace Dungeon
         protected BspDungeonBootstrap dungeon;
         protected Transform heroTransform;
 
+        protected int defaultEnemySpriteSortingOrder = 100;
+
         public void Initialize(DungeonEnemyIdleSprites visuals)
         {
             ConfigureSprites(visuals);
@@ -70,6 +72,8 @@ namespace Dungeon
         protected virtual void Awake()
         {
             spriteRenderer = GetComponent<SpriteRenderer>();
+            if (spriteRenderer != null)
+                defaultEnemySpriteSortingOrder = spriteRenderer.sortingOrder;
             selfActor = GetComponent<ActorBase>();
             damageScratch = ScriptableObject.CreateInstance<ActionDefinition>();
             damageScratch.kind = ActionKind.DamageInstant;
@@ -89,6 +93,32 @@ namespace Dungeon
             CacheDungeonAndHero();
             if (idleSprite != null)
                 spriteRenderer.sprite = idleSprite;
+        }
+
+        private void LateUpdate()
+        {
+            ApplyFootTileSpriteSorting();
+        }
+
+        protected void ApplyFootTileSpriteSorting()
+        {
+            if (spriteRenderer == null)
+                return;
+            if (dungeon == null || dungeon.tilemap == null || dungeon.tileset == null)
+            {
+                CacheDungeonAndHero();
+                if (dungeon == null || dungeon.tilemap == null || dungeon.tileset == null)
+                    return;
+            }
+
+            var map = dungeon.tilemap;
+            var ts = dungeon.tileset;
+            Vector3Int cell = map.WorldToCell(transform.position);
+            TileBase t = map.GetTile(cell);
+            if (t != null && (t == ts.columnCapital || t == ts.columnSmallCapital))
+                spriteRenderer.sortingOrder = VampireEnemyBalance.EnemySpriteSortingBelowColumnCapital;
+            else
+                spriteRenderer.sortingOrder = defaultEnemySpriteSortingOrder;
         }
 
         /// <returns> True if the rest of <see cref="Update"/> should be skipped (attack clip playing or just finished this frame). </returns>
@@ -149,16 +179,17 @@ namespace Dungeon
             if (attackCooldownTimer > 0f)
                 attackCooldownTimer -= dt;
 
-            if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null)
+            if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null || dungeon.tileset == null)
             {
                 CacheDungeonAndHero();
-                if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null)
+                if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null || dungeon.tileset == null)
                     return;
             }
 
             var grid = dungeon.LastGeneratedFloorGrid;
             var tilemap = dungeon.tilemap;
             var origin = dungeon.originCell;
+            var tileset = dungeon.tileset;
 
             Vector2 heroWorld = heroTransform.position;
             Vector2 selfWorld = transform.position;
@@ -200,12 +231,19 @@ namespace Dungeon
             }
 
             repathTimer -= dt;
+            // After a failed plan, wait for repathTimer — do not replan every frame while pathScratch is empty (was killing FPS).
+            if (pathScratch.Count == 0 && repathTimer > 0f)
+            {
+                ApplySpriteWhenIdleChasing();
+                return;
+            }
+
             if (pathScratch.Count == 0 || repathTimer <= 0f)
             {
                 repathTimer = repathIntervalSeconds;
                 var start = new Vector2Int(selfGx, selfGy);
                 var goal = new Vector2Int(heroGx, heroGy);
-                if (!GridPathfinder.TryFindPath(grid, start, goal, pathScratch))
+                if (!EnemyDungeonNav.TryFindPathForEnemy(grid, tilemap, origin, tileset, start, goal, pathScratch))
                 {
                     pathScratch.Clear();
                     if (idleSprite != null)
@@ -390,16 +428,17 @@ namespace Dungeon
 
         private void BeginRetreat()
         {
-            if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null)
+            if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || dungeon.tileset == null)
             {
                 CacheDungeonAndHero();
-                if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null)
+                if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || dungeon.tileset == null)
                     return;
             }
 
             var grid = dungeon.LastGeneratedFloorGrid;
             var tilemap = dungeon.tilemap;
             var origin = dungeon.originCell;
+            var batTileset = dungeon.tileset;
 
             var selfCell = tilemap.WorldToCell(transform.position);
             int selfGx = selfCell.x - origin.x;
@@ -423,7 +462,7 @@ namespace Dungeon
                 if (goal.x < 0 || goal.y < 0 || goal.x >= grid.width || goal.y >= grid.height)
                     continue;
 
-                if (!GridPathfinder.TryFindPath(grid, from, goal, retreatPath))
+                if (!EnemyDungeonNav.TryFindPathForEnemy(grid, tilemap, origin, batTileset, from, goal, retreatPath))
                     continue;
 
                 retreatPathStepIndex = 1;
@@ -564,14 +603,12 @@ namespace Dungeon
     }
 
     /// <summary>
-    /// Chases until within <see cref="rangedHoldChebyshevTiles"/> of the hero, stops on the tile, aims (Z rotation), and applies ranged spell damage on cooldown.
+    /// Pathfinds toward a tile 5–10 Chebyshev from the hero while outside spell range; settles on tile centers; casts when ≤ <see cref="rangedHoldChebyshevTiles"/>.
     /// </summary>
     public class VampireRangedCasterBehaviour : VampireThrallBehaviour
     {
         [Header("Ranged")]
         [Min(1)] public int rangedHoldChebyshevTiles = VampireEnemyBalance.MageRangedHoldChebyshev;
-        [Tooltip("Added to atan2(aim) so your sprite’s forward axis points at the hero. Tweak if the cast frame faces wrong.")]
-        public float aimRotationOffsetDegrees = -90f;
 
         /// <summary>Mage defaults; witch overrides for shorter range.</summary>
         protected virtual void ApplyRangedArchetypeRadii()
@@ -584,6 +621,7 @@ namespace Dungeon
         {
             ApplyRangedArchetypeRadii();
             moveSpeedWorldUnits = VampireEnemyBalance.WitchAndMageMoveSpeedWorldUnits;
+            repathIntervalSeconds = VampireEnemyBalance.CasterRepathIntervalSeconds;
             base.Awake();
         }
 
@@ -600,22 +638,20 @@ namespace Dungeon
             if (attackCooldownTimer > 0f)
                 attackCooldownTimer -= dt;
 
-            if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null)
+            if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null || dungeon.tileset == null)
             {
                 CacheDungeonAndHero();
-                if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null)
+                if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null || dungeon.tileset == null)
                     return;
             }
 
             var grid = dungeon.LastGeneratedFloorGrid;
             var tilemap = dungeon.tilemap;
             var origin = dungeon.originCell;
+            var tileset = dungeon.tileset;
 
-            Vector2 heroWorld = heroTransform.position;
-            Vector2 selfWorld = transform.position;
-
-            var heroCell = tilemap.WorldToCell(heroWorld);
-            var selfCell = tilemap.WorldToCell(selfWorld);
+            var heroCell = tilemap.WorldToCell((Vector2)heroTransform.position);
+            var selfCell = tilemap.WorldToCell(transform.position);
             int heroGx = heroCell.x - origin.x;
             int heroGy = heroCell.y - origin.y;
             int selfGx = selfCell.x - origin.x;
@@ -625,7 +661,19 @@ namespace Dungeon
             if (cheb > aggroRangeTilesChebyshev)
             {
                 pathScratch.Clear();
-                ClearAimRotation();
+                if (spriteRenderer != null && idleSprite != null)
+                    spriteRenderer.sprite = idleSprite;
+                return;
+            }
+
+            Vector3 selfCellCenter = tilemap.GetCellCenterWorld(selfCell);
+            var settleTarget = new Vector3(selfCellCenter.x, selfCellCenter.y, transform.position.z);
+            float offCell = Vector2.Distance(
+                new Vector2(transform.position.x, transform.position.y),
+                new Vector2(selfCellCenter.x, selfCellCenter.y));
+            if (offCell > stillToAttackCellCenterEpsilon)
+            {
+                transform.position = Vector3.MoveTowards(transform.position, settleTarget, moveSpeedWorldUnits * dt);
                 if (idleSprite != null)
                     spriteRenderer.sprite = idleSprite;
                 return;
@@ -633,37 +681,41 @@ namespace Dungeon
 
             if (cheb <= rangedHoldChebyshevTiles)
             {
-                pathScratch.Clear();
-                Vector3 selfCellCenter = tilemap.GetCellCenterWorld(selfCell);
-                var settleTarget = new Vector3(selfCellCenter.x, selfCellCenter.y, transform.position.z);
-                float offCell = Vector2.Distance(
-                    new Vector2(transform.position.x, transform.position.y),
-                    new Vector2(selfCellCenter.x, selfCellCenter.y));
-                if (offCell > stillToAttackCellCenterEpsilon)
-                {
-                    transform.position = Vector3.MoveTowards(transform.position, settleTarget, moveSpeedWorldUnits * dt);
-                    AimAtWorldPoint(heroWorld);
-                    ApplySpriteWhenIdleChasing();
-                    return;
-                }
-
-                AimAtWorldPoint(heroWorld);
                 if (attackCooldownTimer <= 0f)
-                    TryRangedCast(heroWorld);
-                else
-                    ApplySpriteWhenIdleChasing();
+                    TryRangedCast();
+                else if (idleSprite != null && !inAttackAnim)
+                    spriteRenderer.sprite = idleSprite;
                 return;
             }
 
-            ClearAimRotation();
-
             repathTimer -= dt;
+            if (pathScratch.Count == 0 && repathTimer > 0f)
+            {
+                if (idleSprite != null && !inAttackAnim)
+                    spriteRenderer.sprite = idleSprite;
+                return;
+            }
+
             if (pathScratch.Count == 0 || repathTimer <= 0f)
             {
                 repathTimer = repathIntervalSeconds;
                 var start = new Vector2Int(selfGx, selfGy);
-                var goal = new Vector2Int(heroGx, heroGy);
-                if (!GridPathfinder.TryFindPath(grid, start, goal, pathScratch))
+                Vector2Int goal;
+                if (!EnemyDungeonNav.TryPickCasterComfortGoal(
+                        grid,
+                        tilemap,
+                        origin,
+                        tileset,
+                        heroGx,
+                        heroGy,
+                        selfGx,
+                        selfGy,
+                        VampireEnemyBalance.CasterPathfindComfortMinChebyshev,
+                        VampireEnemyBalance.CasterPathfindComfortMaxChebyshev,
+                        out goal))
+                    goal = new Vector2Int(heroGx, heroGy);
+
+                if (!EnemyDungeonNav.TryFindPathForEnemy(grid, tilemap, origin, tileset, start, goal, pathScratch))
                 {
                     pathScratch.Clear();
                     if (idleSprite != null)
@@ -700,30 +752,13 @@ namespace Dungeon
             PerformChaseMovement(dt, nextFlat);
         }
 
-        protected void AimAtWorldPoint(Vector2 worldTarget)
-        {
-            Vector2 dir = worldTarget - (Vector2)transform.position;
-            if (dir.sqrMagnitude < 1e-8f)
-                return;
-            spriteRenderer.flipX = false;
-            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-            transform.rotation = Quaternion.Euler(0f, 0f, angle + aimRotationOffsetDegrees);
-        }
-
-        protected void ClearAimRotation()
-        {
-            transform.rotation = Quaternion.identity;
-        }
-
-        protected virtual void TryRangedCast(Vector2 heroWorld)
+        protected virtual void TryRangedCast()
         {
             pathScratch.Clear();
 
             var heroActor = heroTransform.GetComponent<ActorBase>();
             if (heroActor == null || heroActor.IsDead)
                 return;
-
-            AimAtWorldPoint(heroWorld);
 
             if (attackSprite != null)
                 spriteRenderer.sprite = attackSprite;
@@ -732,12 +767,6 @@ namespace Dungeon
 
             damageScratch.amount = attackDamage;
             heroActor.ApplyStatusEffect(damageScratch);
-        }
-
-        protected override void PerformChaseMovement(float dt, Vector3 nextFlat)
-        {
-            ClearAimRotation();
-            base.PerformChaseMovement(dt, nextFlat);
         }
     }
 

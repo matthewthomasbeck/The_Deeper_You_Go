@@ -16,6 +16,7 @@ namespace Dungeon
             Tilemap decorationTilemap,
             RoomTilesetDefinition tileset,
             Vector3Int originCell,
+            RoomGrid floorGrid,
             float intensity,
             float innerRadius,
             float outerRadius,
@@ -37,7 +38,7 @@ namespace Dungeon
             blockerTilemap.ClearAllTiles();
             ClearChildren(emitterRoot);
 
-            BuildBlockers(baseTilemap, blockerTilemap, tileset);
+            BuildBlockers(baseTilemap, blockerTilemap, tileset, floorGrid, originCell);
             BuildEmitters(
                 baseTilemap,
                 decorationTilemap,
@@ -51,7 +52,12 @@ namespace Dungeon
                 lightColor);
         }
 
-        private static void BuildBlockers(Tilemap baseTilemap, Tilemap blockerTilemap, RoomTilesetDefinition tileset)
+        private static void BuildBlockers(
+            Tilemap baseTilemap,
+            Tilemap blockerTilemap,
+            RoomTilesetDefinition tileset,
+            RoomGrid floorGrid,
+            Vector3Int originCell)
         {
             var bounds = baseTilemap.cellBounds;
             for (int y = bounds.yMin; y < bounds.yMax; y++)
@@ -62,11 +68,58 @@ namespace Dungeon
                     var tile = baseTilemap.GetTile(cell);
                     if (!tileset.IsWallBlockerTile(tile))
                         continue;
+                    if (ShouldSuppressCorridorTrimBlocker(tileset, tile, floorGrid, originCell, x, y))
+                        continue;
                     blockerTilemap.SetTile(cell, tile);
                 }
             }
 
             blockerTilemap.RefreshAllTiles();
+        }
+
+        /// <summary>Hall trims (rooms_0 / breach caps) use wall colliders whose shapes can eat adjacent corridor walkway; omit physics on those paints when touching logical corridor cells.</summary>
+        private static bool ShouldSuppressCorridorTrimBlocker(
+            RoomTilesetDefinition tileset,
+            TileBase paintedTile,
+            RoomGrid grid,
+            Vector3Int origin,
+            int cellX,
+            int cellY)
+        {
+            if (grid == null || tileset == null || paintedTile == null)
+                return false;
+
+            bool isTrimCollidableFromHall =
+                paintedTile == tileset.wallTop
+                || paintedTile == tileset.hallwayBreachWestLower
+                || paintedTile == tileset.hallwayBreachEastLower
+                || paintedTile == tileset.hallwayBreachWestUpperCap
+                || paintedTile == tileset.hallwayBreachEastUpperCap;
+            if (!isTrimCollidableFromHall)
+                return false;
+
+            int gx = cellX - origin.x;
+            int gy = cellY - origin.y;
+
+            bool Corridor(int cx, int cy) =>
+                cx >= 0
+                && cy >= 0
+                && cx < grid.width
+                && cy < grid.height
+                && grid.Get(cx, cy) == RoomTileKind.CorridorFloor;
+
+            for (int ox = -1; ox <= 1; ox++)
+            {
+                for (int oy = -1; oy <= 1; oy++)
+                {
+                    if (ox == 0 && oy == 0)
+                        continue;
+                    if (Corridor(gx + ox, gy + oy))
+                        return true;
+                }
+            }
+
+            return false;
         }
 
         private static void BuildEmitters(
