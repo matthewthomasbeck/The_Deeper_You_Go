@@ -103,6 +103,10 @@ namespace Dungeon
                 var actor = go.AddComponent<ActorBase>();
                 actor.npcAlignment = NpcAlignment.Bad;
 
+                var hitVol = go.AddComponent<CircleCollider2D>();
+                hitVol.isTrigger = true;
+                hitVol.radius = 0.38f;
+
                 if (idleSprites != null && sprite == idleSprites.thrallIdle)
                 {
                     var thrall = go.AddComponent<VampireThrallBehaviour>();

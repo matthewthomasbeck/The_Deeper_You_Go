@@ -1,3 +1,4 @@
+using Dungeon;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -20,6 +21,9 @@ namespace Dungeon.Magic
         private int frameIndex;
         private float maxLifetime = 8f;
         private float age;
+        private bool fromEnemyCaster;
+        private int enemyHitDamage = 1;
+        private int enemyBurstDedupeGroupId;
 
         public void Launch(
             Vector2 startPosition,
@@ -27,13 +31,19 @@ namespace Dungeon.Magic
             float moveSpeed,
             bool bounceOnce,
             Sprite[] animationFrames,
-            int sortingOrder)
+            int sortingOrder,
+            bool enemyCasterProjectile = false,
+            int enemyProjectileDamage = 1,
+            int enemyCasterBurstDedupeGroupId = 0)
         {
             transform.position = new Vector3(startPosition.x, startPosition.y, transform.position.z);
             speed = moveSpeed;
             allowOneBounce = bounceOnce;
             remainingBounces = bounceOnce ? 1 : 0;
             frames = animationFrames;
+            fromEnemyCaster = enemyCasterProjectile;
+            enemyHitDamage = Mathf.Max(1, enemyProjectileDamage);
+            enemyBurstDedupeGroupId = enemyCasterBurstDedupeGroupId;
             velocity = direction.sqrMagnitude > 0.0001f ? direction.normalized * moveSpeed : Vector2.right * moveSpeed;
 
             if (spriteRenderer == null)
@@ -76,7 +86,10 @@ namespace Dungeon.Magic
         private bool TryMoveWithWallResolution(ref Vector2 pos, Vector2 dir, float dist)
         {
             RaycastHit2D[] hits = Physics2D.CircleCastAll(pos, collisionRadius, dir, dist);
-            float bestDist = float.PositiveInfinity;
+            float bestEnemyDist = float.PositiveInfinity;
+            ActorBase bestEnemy = null;
+
+            float bestWallDist = float.PositiveInfinity;
             RaycastHit2D wallHit = default;
             bool foundWall = false;
 
@@ -85,19 +98,45 @@ namespace Dungeon.Magic
                 var h = hits[i];
                 if (h.collider == null)
                     continue;
-                if (h.collider.GetComponentInParent<ActorBase>() != null)
+
+                var actor = h.collider.GetComponentInParent<ActorBase>();
+                if (actor != null)
+                {
+                    bool valid = fromEnemyCaster
+                        ? MagicHitDamage.IsEnemyCasterMagicValidTarget(actor)
+                        : MagicHitDamage.IsHeroMagicValidTarget(actor);
+                    if (valid && h.distance < bestEnemyDist)
+                    {
+                        bestEnemyDist = h.distance;
+                        bestEnemy = actor;
+                    }
                     continue;
+                }
+
                 if (!IsDungeonWallHit(h))
                     continue;
-                if (h.distance < bestDist)
+                if (h.distance < bestWallDist)
                 {
-                    bestDist = h.distance;
+                    bestWallDist = h.distance;
                     wallHit = h;
                     foundWall = true;
                 }
             }
 
-            if (!foundWall)
+            bool enemyFirst = bestEnemy != null
+                && bestEnemyDist <= dist + 1e-4f
+                && (!foundWall || bestEnemyDist <= bestWallDist + 1e-4f);
+            if (enemyFirst)
+            {
+                if (fromEnemyCaster)
+                    MagicHitDamage.ApplyEnemyCasterHit(bestEnemy, enemyHitDamage, enemyBurstDedupeGroupId);
+                else
+                    MagicHitDamage.ApplyOneToNpc(bestEnemy);
+                Destroy(gameObject);
+                return false;
+            }
+
+            if (!foundWall || bestWallDist > dist + 1e-4f)
             {
                 pos += dir * dist;
                 return true;

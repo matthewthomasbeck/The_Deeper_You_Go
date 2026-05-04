@@ -4,44 +4,69 @@ using UnityEngine.Video;
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Dungeon
 {
     /// <summary>
-    /// Shuffled background music from gameplay <see cref="VideoClip"/> assets (audio-only playback).
-    /// Pause / UI is handled by <see cref="PauseMenuController"/> — wire pause buttons there in the Inspector.
+    /// Gameplay shuffle (track_1–3) and pause-menu music (<c>pause_screen</c>) via one <see cref="VideoPlayer"/>.
+    /// Keyboard: <c>M</c> toggles mute, <c>Up</c>/<c>Down</c> adjusts music volume (<see cref="musicVolumeStep"/>).
+    /// Flow: <see cref="GameFlowController"/>.
     /// </summary>
     [DisallowMultipleComponent]
     public class GameplayHudController : MonoBehaviour
     {
+        private enum HudMusicMode
+        {
+            Silent,
+            Gameplay,
+            PauseMenu,
+        }
+
         [Header("Music (VideoClip audio)")]
         [Tooltip("Gameplay tracks; do not include pause_screen here.")]
         [SerializeField]
         private VideoClip[] gameplayMusicClips;
 
+        [Tooltip("Plays from the start whenever you pause (assign pause_screen.mp4). Loops while time is frozen.")]
+        [SerializeField]
+        private VideoClip pauseMusicClip;
+
+        [Tooltip("Music volume change per Up/Down key press.")]
+        [SerializeField]
+        [Range(0.01f, 0.25f)] private float musicVolumeStep = 0.1f;
+
         private VideoPlayer gameplayVp;
         private AudioSource gameplayMusicSource;
 
         private int lastGameplayTrackIndex = -1;
+        private HudMusicMode musicMode = HudMusicMode.Silent;
 
 #if UNITY_EDITOR
         private void OnValidate()
         {
-            if (gameplayMusicClips != null && gameplayMusicClips.Length > 0)
+            if (gameplayMusicClips != null && gameplayMusicClips.Length > 0 && pauseMusicClip != null)
                 return;
 
-            gameplayMusicClips = new[]
+            if (gameplayMusicClips == null || gameplayMusicClips.Length == 0)
             {
-                AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/track_1.mp4"),
-                AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/track_2.mp4"),
-                AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/track_3.mp4"),
-            };
+                gameplayMusicClips = new[]
+                {
+                    AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/track_1.mp4"),
+                    AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/track_2.mp4"),
+                    AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/track_3.mp4"),
+                };
+            }
+
+            if (pauseMusicClip == null)
+                pauseMusicClip = AssetDatabase.LoadAssetAtPath<VideoClip>("Assets/Art/Music/pause_screen.mp4");
         }
 #endif
 
         private void Awake()
         {
-            Time.timeScale = 1f;
             EnsureVideoPlayer();
         }
 
@@ -50,12 +75,90 @@ namespace Dungeon
             WireGameplayMusic();
         }
 
+        private void Update()
+        {
+            if (gameplayMusicSource == null)
+                return;
+
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current == null)
+                return;
+
+            if (Keyboard.current.mKey.wasPressedThisFrame)
+                gameplayMusicSource.mute = !gameplayMusicSource.mute;
+
+            if (Keyboard.current.upArrowKey.wasPressedThisFrame)
+                BumpMusicVolume(musicVolumeStep);
+            else if (Keyboard.current.downArrowKey.wasPressedThisFrame)
+                BumpMusicVolume(-musicVolumeStep);
+#else
+            if (Input.GetKeyDown(KeyCode.M))
+                gameplayMusicSource.mute = !gameplayMusicSource.mute;
+
+            if (Input.GetKeyDown(KeyCode.UpArrow))
+                BumpMusicVolume(musicVolumeStep);
+            else if (Input.GetKeyDown(KeyCode.DownArrow))
+                BumpMusicVolume(-musicVolumeStep);
+#endif
+        }
+
+        private void BumpMusicVolume(float delta)
+        {
+            gameplayMusicSource.volume = Mathf.Clamp01(gameplayMusicSource.volume + delta);
+        }
+
+        /// <summary>Starts pause/menu clip from the beginning (loops while paused). Safe when <c>timeScale == 0</c>.</summary>
+        public void PlayPauseMenuMusicFromStart()
+        {
+            if (gameplayVp == null || pauseMusicClip == null)
+            {
+                if (pauseMusicClip == null)
+                    Debug.LogWarning("GameplayHudController: Assign pause music VideoClip (pause_screen.mp4).");
+                return;
+            }
+
+            musicMode = HudMusicMode.PauseMenu;
+            gameplayVp.prepareCompleted -= OnGameplayPreparedPlay;
+            gameplayVp.prepareCompleted -= OnPauseMenuPreparedPlay;
+            gameplayVp.Stop();
+            gameplayVp.isLooping = true;
+            gameplayVp.clip = pauseMusicClip;
+            gameplayVp.Prepare();
+            gameplayVp.prepareCompleted += OnPauseMenuPreparedPlay;
+        }
+
+        /// <summary>Stops pause music and starts (or resumes) shuffled gameplay tracks.</summary>
+        public void StopPauseMenuMusicAndResumeGameplay()
+        {
+            if (gameplayVp == null || gameplayMusicClips == null || gameplayMusicClips.Length == 0)
+                return;
+
+            musicMode = HudMusicMode.Gameplay;
+            gameplayVp.prepareCompleted -= OnPauseMenuPreparedPlay;
+            gameplayVp.Stop();
+            gameplayVp.isLooping = false;
+            QueueGameplayTrack(PickNextTrackIndex(-1));
+        }
+
+        /// <summary>No music on the death overlay.</summary>
+        public void StopMusicForDeathScreen()
+        {
+            musicMode = HudMusicMode.Silent;
+            if (gameplayVp == null)
+                return;
+            gameplayVp.prepareCompleted -= OnGameplayPreparedPlay;
+            gameplayVp.prepareCompleted -= OnPauseMenuPreparedPlay;
+            gameplayVp.Stop();
+            gameplayVp.isLooping = false;
+        }
+
         private void OnDestroy()
         {
             if (gameplayVp != null)
             {
                 gameplayVp.loopPointReached -= OnGameplayLoopPointReached;
                 gameplayVp.prepareCompleted -= OnGameplayPreparedPlay;
+                gameplayVp.prepareCompleted -= OnPauseMenuPreparedPlay;
             }
         }
 
@@ -110,12 +213,14 @@ namespace Dungeon
         private IEnumerator PlayInitialTrackWhenReady()
         {
             yield return null;
-            if (!IsClockPaused())
+            if (musicMode == HudMusicMode.Gameplay && !IsClockPaused())
                 QueueGameplayTrack(PickNextTrackIndex(-1));
         }
 
         private void OnGameplayLoopPointReached(VideoPlayer vp)
         {
+            if (musicMode != HudMusicMode.Gameplay)
+                return;
             if (IsClockPaused())
                 return;
             QueueGameplayTrack(PickNextTrackIndex(lastGameplayTrackIndex));
@@ -129,15 +234,17 @@ namespace Dungeon
             if (n == 1)
                 return 0;
 
-            int idx = UnityEngine.Random.Range(0, n);
+            int idx = Random.Range(0, n);
             int guard = 0;
             while (idx == exclude && guard++ < 32)
-                idx = UnityEngine.Random.Range(0, n);
+                idx = Random.Range(0, n);
             return idx;
         }
 
         private void QueueGameplayTrack(int clipIndex)
         {
+            if (musicMode != HudMusicMode.Gameplay)
+                return;
             if (clipIndex < 0 || clipIndex >= gameplayMusicClips.Length)
                 return;
             if (gameplayMusicClips[clipIndex] == null)
@@ -147,6 +254,7 @@ namespace Dungeon
             }
 
             lastGameplayTrackIndex = clipIndex;
+            gameplayVp.prepareCompleted -= OnPauseMenuPreparedPlay;
             gameplayVp.Stop();
             gameplayVp.clip = gameplayMusicClips[clipIndex];
             gameplayVp.Prepare();
@@ -157,8 +265,19 @@ namespace Dungeon
         private void OnGameplayPreparedPlay(VideoPlayer vp)
         {
             vp.prepareCompleted -= OnGameplayPreparedPlay;
+            if (musicMode != HudMusicMode.Gameplay)
+                return;
             if (IsClockPaused())
                 return;
+            vp.Play();
+        }
+
+        private void OnPauseMenuPreparedPlay(VideoPlayer vp)
+        {
+            vp.prepareCompleted -= OnPauseMenuPreparedPlay;
+            if (musicMode != HudMusicMode.PauseMenu)
+                return;
+            vp.time = 0d;
             vp.Play();
         }
     }

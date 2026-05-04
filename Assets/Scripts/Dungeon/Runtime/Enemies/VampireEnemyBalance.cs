@@ -24,8 +24,8 @@ namespace Dungeon
         /// <summary>Witch chase radius; matches melee standard so they pursue across a room (5 was easy to leave by one tile, which looked like “no pathfind / idle forever”).</summary>
         public const int WitchAggroChebyshev = MeleeStandardAggroChebyshev;
 
-        /// <summary>Witch stops to cast when hero is within this distance (matches short-range role).</summary>
-        public const int WitchRangedHoldChebyshev = 5;
+        /// <summary>Witch stops to cast when hero is within this distance (omni burst band).</summary>
+        public const int WitchRangedHoldChebyshev = 10;
 
         /// <summary>Mage uses full melee-style detection radius so it can chase into long-range casts.</summary>
         public const int MageAggroChebyshev = MeleeStandardAggroChebyshev;
@@ -41,6 +41,12 @@ namespace Dungeon
 
         /// <summary>Larger interval than melee reduces repath cost when multiple casters are active.</summary>
         public const float CasterRepathIntervalSeconds = 0.55f;
+
+        /// <summary>Seconds between mage/witch omni volleys (no range check; fires until dead).</summary>
+        public const float CasterVolleyIntervalSeconds = 4.4f;
+
+        /// <summary>Multiplies default hero-style projectile speeds when mages/witches fire (lower = slower orbs/bolts).</summary>
+        public const float EnemyCasterProjectileSpeedScale = 0.5f;
 
         /// <summary>
         /// When standing on a column capital (rooms_10 / small cap), draw enemies below the tilemap trim (match hero occlusion feel).

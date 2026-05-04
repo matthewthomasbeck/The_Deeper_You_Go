@@ -678,26 +678,31 @@ namespace Dungeon
     }
 
     /// <summary>
-    /// Paths on the same grid as melee toward the hero tile while outside spell range; settles on tile centers; casts when ≤ <see cref="rangedHoldChebyshevTiles"/>.
+    /// Mage / witch: pathfind toward the hero like melee (no melee strike). Knight move speed. Omni volley on an interval only while on main camera.
     /// </summary>
     public class VampireRangedCasterBehaviour : VampireThrallBehaviour
     {
-        [Header("Ranged")]
-        [Min(1)] public int rangedHoldChebyshevTiles = VampireEnemyBalance.MageRangedHoldChebyshev;
+        [Header("Ranged (volley + chase)")]
+        [Tooltip("Seconds between omni bursts; defaults from balance.")]
+        [Min(0.05f)] public float volleyIntervalSeconds = VampireEnemyBalance.CasterVolleyIntervalSeconds;
 
-        /// <summary>Mage defaults; witch overrides for shorter range.</summary>
+        [Tooltip("Viewport margin so partially visible casters still fire (0 = strict screen edges).")]
+        [Range(0f, 0.35f)] public float onScreenViewportMargin = 0.12f;
+
+        private float volleyCountdown;
+
         protected virtual void ApplyRangedArchetypeRadii()
         {
             aggroRangeTilesChebyshev = VampireEnemyBalance.MageAggroChebyshev;
-            rangedHoldChebyshevTiles = VampireEnemyBalance.MageRangedHoldChebyshev;
         }
 
         protected override void Awake()
         {
             ApplyRangedArchetypeRadii();
-            moveSpeedWorldUnits = VampireEnemyBalance.WitchAndMageMoveSpeedWorldUnits;
+            moveSpeedWorldUnits = VampireEnemyBalance.KnightMoveSpeedWorldUnits;
             repathIntervalSeconds = VampireEnemyBalance.CasterRepathIntervalSeconds;
             base.Awake();
+            volleyCountdown = 0f;
         }
 
         protected override void Update()
@@ -719,12 +724,13 @@ namespace Dungeon
                     return;
             }
 
-            var grid = dungeon.LastGeneratedFloorGrid;
-            var tilemap = dungeon.tilemap;
-            var origin = dungeon.originCell;
-            var tileset = dungeon.tileset;
+            RoomGrid grid = dungeon.LastGeneratedFloorGrid;
+            Tilemap tilemap = dungeon.tilemap;
+            Vector3Int origin = dungeon.originCell;
+            RoomTilesetDefinition tileset = dungeon.tileset;
 
-            var heroCell = tilemap.WorldToCell((Vector2)heroTransform.position);
+            Vector2 heroWorld = heroTransform.position;
+            var heroCell = tilemap.WorldToCell(heroWorld);
             heroCell.z = origin.z;
             var selfCell = tilemap.WorldToCell(transform.position);
             selfCell.z = origin.z;
@@ -733,27 +739,21 @@ namespace Dungeon
             int selfGx = selfCell.x - origin.x;
             int selfGy = selfCell.y - origin.y;
 
+            if (IsCasterOnMainCamera())
+            {
+                volleyCountdown -= dt;
+                while (volleyCountdown <= 0f)
+                {
+                    volleyCountdown += Mathf.Max(0.05f, volleyIntervalSeconds);
+                    UpdateFacing(heroWorld.x - transform.position.x);
+                    VolleyFireMagic();
+                }
+            }
+
             int cheb = Mathf.Max(Mathf.Abs(heroGx - selfGx), Mathf.Abs(heroGy - selfGy));
             if (cheb > aggroRangeTilesChebyshev)
             {
                 pathScratch.Clear();
-                if (spriteRenderer != null && idleSprite != null)
-                    spriteRenderer.sprite = idleSprite;
-                return;
-            }
-
-            // Cast while in range even if not perfectly snapped to tile centre; settle only matters for grid path steps.
-            if (cheb <= rangedHoldChebyshevTiles)
-            {
-                if (attackCooldownTimer <= 0f)
-                    TryRangedCast();
-                else if (idleSprite != null && !inAttackAnim)
-                    spriteRenderer.sprite = idleSprite;
-                return;
-            }
-
-            if (!EnsureSettledOnOwnCellCenterForGrid(tilemap, dt))
-            {
                 if (idleSprite != null)
                     spriteRenderer.sprite = idleSprite;
                 return;
@@ -762,8 +762,7 @@ namespace Dungeon
             repathTimer -= dt;
             if (pathScratch.Count == 0 && repathTimer > 0f)
             {
-                if (idleSprite != null && !inAttackAnim)
-                    spriteRenderer.sprite = idleSprite;
+                ApplySpriteWhenIdleChasing();
                 return;
             }
 
@@ -772,7 +771,6 @@ namespace Dungeon
                 repathTimer = repathIntervalSeconds;
                 var start = new Vector2Int(selfGx, selfGy);
                 var goal = new Vector2Int(heroGx, heroGy);
-
                 if (!EnemyDungeonNav.TryFindPathForEnemy(grid, tilemap, origin, tileset, start, goal, pathScratch))
                 {
                     pathScratch.Clear();
@@ -810,27 +808,24 @@ namespace Dungeon
             PerformChaseMovement(dt, nextFlat);
         }
 
-        protected virtual void TryRangedCast()
+        private bool IsCasterOnMainCamera()
         {
-            pathScratch.Clear();
+            Camera cam = Camera.main;
+            if (cam == null)
+                return false;
+            Vector3 vp = cam.WorldToViewportPoint(transform.position);
+            if (vp.z <= 0f)
+                return false;
+            float m = onScreenViewportMargin;
+            return vp.x >= -m && vp.x <= 1f + m && vp.y >= -m && vp.y <= 1f + m;
+        }
 
-            var heroActor = ResolveHeroActor(heroTransform);
-            if (heroActor == null || heroActor.IsDead)
-                return;
-
-            if (attackSprite != null)
-                spriteRenderer.sprite = attackSprite;
-            inAttackAnim = true;
-            attackAnimTimer = Mathf.Max(0.05f, attackClipSeconds);
-            if (!float.IsFinite(attackAnimTimer))
-                attackAnimTimer = 0.05f;
-
-            damageScratch.amount = attackDamage;
-            heroActor.ApplyStatusEffect(damageScratch);
+        protected void VolleyFireMagic()
+        {
             SpawnRangedSpellVisualTowardHero();
         }
 
-        /// <summary>Enemy-specific VFX (damage already applied in <see cref="TryRangedCast"/>).</summary>
+        /// <summary>Enemy-specific VFX; damage comes from projectiles / rays (hero only).</summary>
         protected virtual void SpawnRangedSpellVisualTowardHero()
         {
         }
@@ -853,14 +848,12 @@ namespace Dungeon
 
         protected override void SpawnRangedSpellVisualTowardHero()
         {
-            if (heroTransform == null)
-                return;
             int order = spriteRenderer != null ? spriteRenderer.sortingOrder : 100;
-            EnemyCasterSpellVisuals.SpawnNextMageSpell(
+            EnemyCasterSpellVisuals.SpawnMageOmnidirectionalBurst(
                 transform.position,
-                heroTransform.position,
                 order,
-                ref _mageSpellRotor);
+                ref _mageSpellRotor,
+                attackDamage);
         }
     }
 
@@ -868,12 +861,6 @@ namespace Dungeon
     public class VampireWitchBehaviour : VampireRangedCasterBehaviour
     {
         private int _witchSpellRotor;
-
-        protected override void ApplyRangedArchetypeRadii()
-        {
-            aggroRangeTilesChebyshev = VampireEnemyBalance.WitchAggroChebyshev;
-            rangedHoldChebyshevTiles = VampireEnemyBalance.WitchRangedHoldChebyshev;
-        }
 
         protected override void ConfigureSprites(DungeonEnemyIdleSprites visuals)
         {
@@ -887,14 +874,12 @@ namespace Dungeon
 
         protected override void SpawnRangedSpellVisualTowardHero()
         {
-            if (heroTransform == null)
-                return;
             int order = spriteRenderer != null ? spriteRenderer.sortingOrder : 100;
-            EnemyCasterSpellVisuals.SpawnNextWitchSpell(
+            EnemyCasterSpellVisuals.SpawnWitchOmnidirectionalBurst(
                 transform.position,
-                heroTransform.position,
                 order,
-                ref _witchSpellRotor);
+                ref _witchSpellRotor,
+                attackDamage);
         }
     }
 }

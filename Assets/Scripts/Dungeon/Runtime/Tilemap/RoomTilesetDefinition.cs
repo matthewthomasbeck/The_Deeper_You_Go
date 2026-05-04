@@ -104,9 +104,9 @@ namespace Dungeon
         public TileBase chestSmallMediumRegular;
         [Tooltip("Default small/medium rare chest (e.g. rooms_38).")]
         public TileBase chestSmallMediumRare;
-        [Tooltip("Large-room regular chest (e.g. rooms_38).")]
+        [Tooltip("Large-room basic chest tier (rooms_37 style on large rug).")]
         public TileBase chestLargeRegular;
-        [Tooltip("Large-room rare chest (e.g. rooms_39).")]
+        [Tooltip("Ultra chest tier (rooms_39); also used as ultra roll for small/medium rooms.")]
         public TileBase chestLargeRare;
 
         [Header("Carpet borders")]
@@ -176,6 +176,30 @@ namespace Dungeon
                    || tile == hallwayBreachEastUpperCap
                    || tile == hallwayBreachWestUpperCap
                    || tile == columnSmallBase;
+        }
+
+        /// <summary>rooms_37 basic, rooms_38 rare, rooms_39 ultra (large ultra uses <see cref="chestLargeRare"/>).</summary>
+        public bool TryGetChestMagicTier(TileBase tile, out ChestMagicTier tier)
+        {
+            tier = ChestMagicTier.None;
+            if (tile == null)
+                return false;
+            if (tile == chestLargeRare)
+            {
+                tier = ChestMagicTier.Ultra;
+                return true;
+            }
+            if (tile == chestSmallMediumRare)
+            {
+                tier = ChestMagicTier.Rare;
+                return true;
+            }
+            if (tile == chestSmallMediumRegular || tile == chestLargeRegular)
+            {
+                tier = ChestMagicTier.Basic;
+                return true;
+            }
+            return false;
         }
     }
 }

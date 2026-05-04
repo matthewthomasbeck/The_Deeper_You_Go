@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Dungeon;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -40,6 +41,10 @@ namespace Dungeon.Magic
 
         [Tooltip("Editor / editor play mode: fills spell list from Assets/Art/Magic when empty.")]
         [SerializeField] private bool autoPopulateWhenEmptyInEditor = true;
+
+        [Header("Spell damage (per hit roll)")]
+        [SerializeField] private int spellDamageMin = 1;
+        [SerializeField] private int spellDamageMax = 2;
 
         private Transform HeroTransform => transform;
 
@@ -103,11 +108,13 @@ namespace Dungeon.Magic
                 PopulateSpellsFromMagicFolder();
 #endif
             equippedIndex = Mathf.Clamp(equippedIndex, 0, Mathf.Max(0, spells.Count - 1));
+            if (Application.isPlaying)
+                TryEquipRandomElementalStarter();
         }
 
         private void Update()
         {
-            if (Dungeon.GamePauseState.IsPaused)
+            if (GamePauseState.IsPaused)
                 return;
 
             UpdateSpellHotkeys();
@@ -133,6 +140,75 @@ namespace Dungeon.Magic
                 spawnOffsetAlongAim,
                 rayMaxLengthTiles,
                 aimSortingOrder);
+            return true;
+        }
+
+        public int RollSpellDamage()
+        {
+            int lo = Mathf.Min(spellDamageMin, spellDamageMax);
+            int hi = Mathf.Max(spellDamageMin, spellDamageMax);
+            return UnityEngine.Random.Range(lo, hi + 1);
+        }
+
+        public void SetSpellDamageRange(int minInclusive, int maxInclusive)
+        {
+            spellDamageMin = Mathf.Max(1, minInclusive);
+            spellDamageMax = Mathf.Max(spellDamageMin, maxInclusive);
+        }
+
+        /// <summary>Removes chest overlay, sets damage band and equips a random spell from that tier pool.</summary>
+        public void ApplyChestMagicReward(ChestMagicTier tier)
+        {
+            switch (tier)
+            {
+                case ChestMagicTier.Basic:
+                    SetSpellDamageRange(1, 2);
+                    TryEquipRandomFromPool(MagicSpellPools.Elemental);
+                    break;
+                case ChestMagicTier.Rare:
+                    SetSpellDamageRange(3, 4);
+                    TryEquipRandomFromPool(MagicSpellPools.RareMagicBlackWhite);
+                    break;
+                case ChestMagicTier.Ultra:
+                    SetSpellDamageRange(5, 10);
+                    TryEquipRandomFromPool(MagicSpellPools.DarknessPurity);
+                    break;
+            }
+        }
+
+        private void TryEquipRandomElementalStarter()
+        {
+            if (spells == null || spells.Count == 0)
+                return;
+            SetSpellDamageRange(1, 2);
+            if (!TryEquipRandomFromPool(MagicSpellPools.Elemental))
+                equippedIndex = UnityEngine.Random.Range(0, spells.Count);
+        }
+
+        private bool TryEquipRandomFromPool(IReadOnlyList<string> spellIds)
+        {
+            if (spells == null || spells.Count == 0 || spellIds == null || spellIds.Count == 0)
+                return false;
+
+            var candidates = new List<int>(8);
+            for (int i = 0; i < spells.Count; i++)
+            {
+                MagicSpellEntry e = spells[i];
+                if (e == null || string.IsNullOrEmpty(e.spellId))
+                    continue;
+                for (int j = 0; j < spellIds.Count; j++)
+                {
+                    if (string.Equals(e.spellId, spellIds[j], StringComparison.OrdinalIgnoreCase))
+                    {
+                        candidates.Add(i);
+                        break;
+                    }
+                }
+            }
+
+            if (candidates.Count == 0)
+                return false;
+            equippedIndex = candidates[UnityEngine.Random.Range(0, candidates.Count)];
             return true;
         }
 

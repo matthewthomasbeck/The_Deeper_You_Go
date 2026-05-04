@@ -6,9 +6,9 @@ using UnityEngine.InputSystem;
 namespace Dungeon
 {
     /// <summary>
-    /// Minimal pause menu: wire <b>only</b> Unity Inspector <c>Button → OnClick()</c> to
-    /// <see cref="TogglePauseMenu"/>, <see cref="OpenPauseMenu"/>, or <see cref="ClosePauseMenu"/>.
-    /// Does not auto-wire in code — avoids duplicate listeners and “mystery” pauses on Play.
+    /// Pause overlay: keyboard <c>P</c> toggles, <c>Escape</c> closes while open,
+    /// <c>C</c> cycles hero appearance. Optional pause panel wired in Inspector.
+    /// Music controls live on <see cref="GameplayHudController"/>.
     /// </summary>
     public class PauseMenuController : MonoBehaviour
     {
@@ -20,7 +20,6 @@ namespace Dungeon
 
         private void Awake()
         {
-            Time.timeScale = 1f;
             menuOpen = false;
             if (pausePanel != null)
                 pausePanel.SetActive(false);
@@ -28,18 +27,44 @@ namespace Dungeon
 
         private void LateUpdate()
         {
-            if (Time.timeScale < 0.01f && pausePanel != null && !pausePanel.activeInHierarchy)
-            {
-                Time.timeScale = 1f;
-                menuOpen = false;
-            }
+            // Recover inconsistent state only (menu thinks it's open but panel was destroyed/hidden).
+            if (!menuOpen || pausePanel == null)
+                return;
+            if (pausePanel.activeInHierarchy)
+                return;
+            menuOpen = false;
+            Time.timeScale = 1f;
         }
 
         private void Update()
         {
 #if ENABLE_INPUT_SYSTEM
-            if (menuOpen && Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            if (Keyboard.current == null)
+                return;
+
+            if (menuOpen && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
                 ClosePauseMenu();
+                return;
+            }
+
+            if (Keyboard.current.pKey.wasPressedThisFrame)
+                TogglePauseMenu();
+
+            if (Keyboard.current.cKey.wasPressedThisFrame)
+                CycleHeroAppearance();
+#else
+            if (menuOpen && Input.GetKeyDown(KeyCode.Escape))
+            {
+                ClosePauseMenu();
+                return;
+            }
+
+            if (Input.GetKeyDown(KeyCode.P))
+                TogglePauseMenu();
+
+            if (Input.GetKeyDown(KeyCode.C))
+                CycleHeroAppearance();
 #endif
         }
 

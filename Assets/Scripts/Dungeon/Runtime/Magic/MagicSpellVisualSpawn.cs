@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Dungeon.Magic
 {
-    /// <summary>Shared hero / enemy spell VFX spawn rules (no damage).</summary>
+    /// <summary>Shared hero / enemy spell VFX spawn rules; damage uses <see cref="MagicHitDamage"/>.</summary>
     public static class MagicSpellVisualSpawn
     {
         public static void Spawn(
@@ -13,7 +13,10 @@ namespace Dungeon.Magic
             Transform shieldFollowTransform,
             float spawnOffsetAlongAim,
             float rayMaxLength,
-            int aimSortingOrder)
+            int aimSortingOrder,
+            bool enemyCasterMagic = false,
+            int enemyMagicDamage = 1,
+            int enemyCasterBurstDedupeGroupId = 0)
         {
             if (entry == null)
                 return;
@@ -34,7 +37,14 @@ namespace Dungeon.Magic
                     rayGo.transform.SetParent(null);
                     rayGo.transform.position = new Vector3(originWorld.x, originWorld.y, 0f);
                     var ray = rayGo.AddComponent<MagicRayBurstBehaviour>();
-                    ray.Init(originWorld, rayEnd, Color.white, MagicVisualPresentation.RayWidthMultiplier);
+                    ray.Init(
+                        originWorld,
+                        rayEnd,
+                        Color.white,
+                        MagicVisualPresentation.RayWidthMultiplier,
+                        enemyCasterMagic,
+                        enemyMagicDamage,
+                        enemyCasterBurstDedupeGroupId);
                     break;
                 }
 
@@ -50,13 +60,43 @@ namespace Dungeon.Magic
                 }
 
                 case MagicSpellKind.ProjectileOrb:
-                    SpawnProjectile(entry, originWorld, dir, VampireEnemyBalance.ThrallMoveSpeedWorldUnits, true, spawnOffsetAlongAim, aimSortingOrder);
+                {
+                    float spd = VampireEnemyBalance.ThrallMoveSpeedWorldUnits;
+                    if (enemyCasterMagic)
+                        spd *= VampireEnemyBalance.EnemyCasterProjectileSpeedScale;
+                    SpawnProjectile(
+                        entry,
+                        originWorld,
+                        dir,
+                        spd,
+                        true,
+                        spawnOffsetAlongAim,
+                        aimSortingOrder,
+                        enemyCasterMagic,
+                        enemyMagicDamage,
+                        enemyCasterBurstDedupeGroupId);
                     break;
+                }
 
                 case MagicSpellKind.ProjectileFast:
                 default:
-                    SpawnProjectile(entry, originWorld, dir, VampireEnemyBalance.ThrallMoveSpeedWorldUnits * 2f, false, spawnOffsetAlongAim, aimSortingOrder);
+                {
+                    float spd = VampireEnemyBalance.ThrallMoveSpeedWorldUnits * 2f;
+                    if (enemyCasterMagic)
+                        spd *= VampireEnemyBalance.EnemyCasterProjectileSpeedScale;
+                    SpawnProjectile(
+                        entry,
+                        originWorld,
+                        dir,
+                        spd,
+                        false,
+                        spawnOffsetAlongAim,
+                        aimSortingOrder,
+                        enemyCasterMagic,
+                        enemyMagicDamage,
+                        enemyCasterBurstDedupeGroupId);
                     break;
+                }
             }
         }
 
@@ -67,12 +107,24 @@ namespace Dungeon.Magic
             float speed,
             bool bounceOnce,
             float spawnOffsetAlongAim,
-            int aimSortingOrder)
+            int aimSortingOrder,
+            bool enemyCasterMagic,
+            int enemyMagicDamage,
+            int enemyCasterBurstDedupeGroupId)
         {
             Vector2 spawn = originWorld + dirNorm * spawnOffsetAlongAim;
             var go = new GameObject($"MagicProjectile_{entry.spellId}");
             var proj = go.AddComponent<MagicProjectileBehaviour>();
-            proj.Launch(spawn, dirNorm, speed, bounceOnce, entry.frames, aimSortingOrder + 10);
+            proj.Launch(
+                spawn,
+                dirNorm,
+                speed,
+                bounceOnce,
+                entry.frames,
+                aimSortingOrder + 10,
+                enemyCasterMagic,
+                enemyMagicDamage,
+                enemyCasterBurstDedupeGroupId);
         }
     }
 }

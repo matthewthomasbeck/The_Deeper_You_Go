@@ -286,10 +286,20 @@ namespace Dungeon
         private void Die()
         {
             isDead = true;
+
+            if (actorKind == ActorKind.Npc && npcAlignment == NpcAlignment.Bad)
+                GameRunScore.RegisterEnemyKill();
+
             if (inventory != null)
                 inventory.drop_item(this);
 
-            // important: later add death animation and despawn
+            if (actorKind == ActorKind.Npc)
+                Destroy(gameObject);
+            else if (actorKind == ActorKind.Hero)
+            {
+                HeroLifecycle.RaiseHeroDied();
+                Destroy(gameObject);
+            }
         }
 
         [Serializable]

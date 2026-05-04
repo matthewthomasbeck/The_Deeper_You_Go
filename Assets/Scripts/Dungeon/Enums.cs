@@ -94,5 +94,14 @@ namespace Dungeon
             }
         }
     }
+
+    /// <summary>Chest tiles rooms_37 (basic), 38 (rare), 39 (ultra) — see <see cref="RoomTilesetDefinition.TryGetChestTier"/>.</summary>
+    public enum ChestMagicTier
+    {
+        None = 0,
+        Basic = 1,
+        Rare = 2,
+        Ultra = 3,
+    }
 }
 

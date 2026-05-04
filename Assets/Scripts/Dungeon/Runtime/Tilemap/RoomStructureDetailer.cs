@@ -371,7 +371,7 @@ namespace Dungeon
                 DecorateLargeRooms(decorationTilemap, tilemap, origin, tileset, floorGrid, roomCells, enemyIdleSprites);
         }
 
-        /// <summary>Columns, overlay light (rooms_41), 10% furnish (rooms_34), 10% rare chest (rooms_37) only.</summary>
+        /// <summary>Columns, overlay light (rooms_41), 10% furnish (rooms_34), guaranteed chest (rooms_37/38/39).</summary>
         public static void DecorateSmallRooms(
             Tilemap decorationTilemap,
             Tilemap tilemap,
@@ -398,10 +398,13 @@ namespace Dungeon
                 origin,
                 tileset,
                 roomCells,
-                regularChest: null,
-                rareChest: tileset.chestSmallMediumRegular,
-                rareChance: 0.1f,
-                style);
+                tileset.chestSmallMediumRegular,
+                tileset.chestSmallMediumRare,
+                tileset.chestLargeRare,
+                rareChance: 0.14f,
+                ultraChance: 0.04f,
+                style,
+                guaranteeOneChest: true);
             RoomEnemySpawner.SpawnStillEnemiesInRoom(
                 tilemap,
                 decorationTilemap,
@@ -443,7 +446,9 @@ namespace Dungeon
                 roomCells,
                 tileset.chestSmallMediumRegular,
                 tileset.chestSmallMediumRare,
-                0.1f,
+                tileset.chestLargeRare,
+                rareChance: 0.14f,
+                ultraChance: 0.04f,
                 style,
                 guaranteeOneChest: true);
             RoomEnemySpawner.SpawnStillEnemiesInRoom(
@@ -479,7 +484,9 @@ namespace Dungeon
                 roomCells,
                 bench,
                 bench,
-                1f,
+                null,
+                rareChance: 0f,
+                ultraChance: 0f,
                 style,
                 guaranteeOneChest: true);
         }
@@ -511,8 +518,10 @@ namespace Dungeon
                 tileset,
                 roomCells,
                 tileset.chestLargeRegular,
+                tileset.chestSmallMediumRare,
                 tileset.chestLargeRare,
-                0.1f,
+                rareChance: 0.15f,
+                ultraChance: 0.05f,
                 style,
                 guaranteeOneChest: true);
             RoomEnemySpawner.SpawnStillEnemiesInRoom(
@@ -1761,9 +1770,11 @@ namespace Dungeon
             Vector3Int origin,
             RoomTilesetDefinition tileset,
             HashSet<Vector2Int> roomCells,
-            TileBase regularChest,
-            TileBase rareChest,
+            TileBase chestBasic,
+            TileBase chestRare,
+            TileBase chestUltra,
             float rareChance,
+            float ultraChance,
             ColumnStampStyle? columnStampStyle = null,
             bool guaranteeOneChest = false)
         {
@@ -1771,25 +1782,44 @@ namespace Dungeon
                 return;
 
             var colStyle = columnStampStyle ?? ColumnStampStyle.LargeRoom(tileset);
+            float r = Mathf.Clamp01(rareChance);
+            float u = Mathf.Clamp01(ultraChance);
+            if (r + u > 1f)
+            {
+                float s = r + u;
+                r /= s;
+                u /= s;
+            }
+
+            TileBase PickTierChest()
+            {
+                float roll = UnityEngine.Random.value;
+                if (chestUltra != null && roll < u)
+                    return chestUltra;
+                if (chestRare != null && roll < u + r)
+                    return chestRare;
+                return chestBasic;
+            }
+
             TileBase chosen = null;
-            bool rollRare = UnityEngine.Random.value < Mathf.Clamp01(rareChance);
             if (guaranteeOneChest)
             {
-                if (rollRare && rareChest != null)
-                    chosen = rareChest;
-                else
-                    chosen = regularChest;
+                chosen = PickTierChest();
                 if (chosen == null)
-                    chosen = rareChest;
+                    chosen = chestUltra ?? chestRare ?? chestBasic;
                 if (chosen == null)
-                    chosen = regularChest;
+                    return;
             }
             else
             {
-                if (rollRare && rareChest != null)
-                    chosen = rareChest;
+                if (chestBasic == null && chestRare == null && chestUltra == null)
+                    return;
+                bool rollSpawn = UnityEngine.Random.value < Mathf.Clamp01(rareChance + ultraChance + 0.25f);
+                if (!rollSpawn)
+                    return;
+                chosen = PickTierChest();
                 if (chosen == null)
-                    chosen = regularChest;
+                    chosen = chestBasic ?? chestRare ?? chestUltra;
                 if (chosen == null)
                     return;
             }

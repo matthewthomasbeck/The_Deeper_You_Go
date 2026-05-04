@@ -35,6 +35,8 @@ namespace Dungeon
         public int heroOccludedSortingOrder = 7;
         public bool keepCameraCenteredOnHero = true;
         public Tilemap dungeonTilemap;
+        [Tooltip("Chests / lights overlay; auto-resolved from BspDungeonBootstrap or Grid/DungeonDecoration.")]
+        public Tilemap decorationTilemap;
         public RoomTilesetDefinition roomTileset;
         public float runCycleDurationSeconds = 1f;
 
@@ -105,6 +107,9 @@ namespace Dungeon
 
         private void Update()
         {
+            if (hero != null && hero.IsDead)
+                return;
+
             if (GamePauseState.IsPaused)
             {
                 moveInput = Vector2.zero;
@@ -113,6 +118,7 @@ namespace Dungeon
 
             ReadMoveInput();
             UpdateHeroAnimation();
+            TryPickupChestUnderHero();
             HandleMouseInput();
         }
 
@@ -121,6 +127,12 @@ namespace Dungeon
 
         private void FixedUpdate()
         {
+            if (hero != null && hero.IsDead)
+            {
+                rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
             if (GamePauseState.IsPaused)
             {
                 rb.linearVelocity = Vector2.zero;
@@ -163,8 +175,9 @@ namespace Dungeon
 
                 if (Keyboard.current.aKey.isPressed || Keyboard.current.leftArrowKey.isPressed) x -= 1f;
                 if (Keyboard.current.dKey.isPressed || Keyboard.current.rightArrowKey.isPressed) x += 1f;
-                if (Keyboard.current.sKey.isPressed || Keyboard.current.downArrowKey.isPressed) y -= 1f;
-                if (Keyboard.current.wKey.isPressed || Keyboard.current.upArrowKey.isPressed) y += 1f;
+                // Up/down arrows reserved for HUD music volume; use W/S for vertical move.
+                if (Keyboard.current.sKey.isPressed) y -= 1f;
+                if (Keyboard.current.wKey.isPressed) y += 1f;
                 return new Vector2(x, y);
             }
 #endif
@@ -475,6 +488,52 @@ namespace Dungeon
                 var bootstrap = Object.FindFirstObjectByType<BspDungeonBootstrap>();
                 if (bootstrap != null)
                     roomTileset = bootstrap.tileset;
+            }
+
+            if (decorationTilemap == null)
+            {
+                var bootstrap = Object.FindFirstObjectByType<BspDungeonBootstrap>();
+                if (bootstrap != null && bootstrap.decorationTilemap != null)
+                    decorationTilemap = bootstrap.decorationTilemap;
+                if (decorationTilemap == null && dungeonTilemap != null)
+                {
+                    var grid = dungeonTilemap.GetComponentInParent<Grid>();
+                    if (grid != null)
+                    {
+                        Transform dec = grid.transform.Find("DungeonDecoration");
+                        if (dec != null)
+                            decorationTilemap = dec.GetComponent<Tilemap>();
+                    }
+                }
+            }
+        }
+
+        private void TryPickupChestUnderHero()
+        {
+            if (GamePauseState.IsPaused)
+                return;
+            if (magicCaster == null)
+                return;
+            AutoResolveDungeonReferences();
+            if (decorationTilemap == null || roomTileset == null)
+                return;
+
+            Vector3Int cell = decorationTilemap.WorldToCell(transform.position);
+            TileBase t = decorationTilemap.GetTile(cell);
+            if (t == null)
+                return;
+            if (!roomTileset.TryGetChestMagicTier(t, out ChestMagicTier tier) || tier == ChestMagicTier.None)
+                return;
+
+            bool removedLightSource = roomTileset.IsLightSourceTile(t);
+            decorationTilemap.SetTile(cell, null);
+            magicCaster.ApplyChestMagicReward(tier);
+
+            if (removedLightSource)
+            {
+                var boot = BspDungeonBootstrap.Instance;
+                if (boot != null)
+                    boot.RequestDecorationLightingRefresh();
             }
         }
 

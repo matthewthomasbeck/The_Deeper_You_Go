@@ -56,6 +56,8 @@ namespace Dungeon
         [Tooltip("Log each step to the Console (disable after you confirm it works).")]
         public bool verboseLogs = true;
 
+        private bool pendingDecorationLightingRefresh;
+
         [Tooltip("After generate, move Camera.main to the dungeon center and set orthographic size so the full grid fits the Game view.")]
         public bool frameMainCameraOnDungeon = true;
 
@@ -131,6 +133,23 @@ namespace Dungeon
                 Instance = null;
         }
 
+        private void LateUpdate()
+        {
+            if (!pendingDecorationLightingRefresh)
+                return;
+            pendingDecorationLightingRefresh = false;
+            if (buildRuntimeLighting)
+                RefreshRuntimeLighting();
+        }
+
+        /// <summary>Queues a single lighting rebuild (coalesces many calls in one frame).</summary>
+        public void RequestDecorationLightingRefresh()
+        {
+            if (!buildRuntimeLighting)
+                return;
+            pendingDecorationLightingRefresh = true;
+        }
+
         private void Start()
         {
             if (!generateOnPlay)
@@ -167,6 +186,8 @@ namespace Dungeon
 
             if (verboseLogs)
                 Debug.Log($"[BspDungeon] Tileset OK: {tileset.name}", this);
+
+            pendingDecorationLightingRefresh = false;
 
             if (tilemap == null)
             {
@@ -404,6 +425,25 @@ namespace Dungeon
             var chosen = candidates[UnityEngine.Random.Range(0, candidates.Count)];
             Vector3 world = tilemap.GetCellCenterWorld(chosen);
             playerGo.transform.position = new Vector3(world.x, world.y, playerGo.transform.position.z);
+        }
+
+        /// <summary>Call after changing decoration tiles at runtime (e.g. chest pickup).</summary>
+        public void RefreshRuntimeLighting()
+        {
+            if (!buildRuntimeLighting || tilemap == null || decorationTilemap == null || tileset == null || LastGeneratedFloorGrid == null)
+                return;
+
+            DungeonLightingBuilder.Rebuild(
+                tilemap,
+                decorationTilemap,
+                tileset,
+                originCell,
+                LastGeneratedFloorGrid,
+                runtimeLightIntensity,
+                runtimeLightInnerRadius,
+                runtimeLightOuterRadius,
+                runtimeLightShadowIntensity,
+                runtimeLightColor);
         }
     }
 }
