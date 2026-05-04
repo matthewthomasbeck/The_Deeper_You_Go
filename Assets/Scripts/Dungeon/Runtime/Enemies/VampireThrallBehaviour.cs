@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Dungeon.Magic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -767,12 +768,20 @@ namespace Dungeon
 
             damageScratch.amount = attackDamage;
             heroActor.ApplyStatusEffect(damageScratch);
+            SpawnRangedSpellVisualTowardHero();
+        }
+
+        /// <summary>Enemy-specific VFX (damage already applied in <see cref="TryRangedCast"/>).</summary>
+        protected virtual void SpawnRangedSpellVisualTowardHero()
+        {
         }
     }
 
     /// <summary>Ranged caster; assign mage move/attack sprites in data.</summary>
     public class VampireMageBehaviour : VampireRangedCasterBehaviour
     {
+        private int _mageSpellRotor;
+
         protected override void ConfigureSprites(DungeonEnemyIdleSprites visuals)
         {
             if (visuals == null)
@@ -782,11 +791,25 @@ namespace Dungeon
             move2Sprite = visuals.mageMove2 != null ? visuals.mageMove2 : move1Sprite;
             attackSprite = visuals.mageAttack != null ? visuals.mageAttack : visuals.mageIdle;
         }
+
+        protected override void SpawnRangedSpellVisualTowardHero()
+        {
+            if (heroTransform == null)
+                return;
+            int order = spriteRenderer != null ? spriteRenderer.sortingOrder : 100;
+            EnemyCasterSpellVisuals.SpawnNextMageSpell(
+                transform.position,
+                heroTransform.position,
+                order,
+                ref _mageSpellRotor);
+        }
     }
 
     /// <summary>Ranged caster; assign witch move/attack sprites in data.</summary>
     public class VampireWitchBehaviour : VampireRangedCasterBehaviour
     {
+        private int _witchSpellRotor;
+
         protected override void ApplyRangedArchetypeRadii()
         {
             aggroRangeTilesChebyshev = VampireEnemyBalance.WitchAggroChebyshev;
@@ -801,6 +824,18 @@ namespace Dungeon
             move1Sprite = visuals.witchMove1 != null ? visuals.witchMove1 : visuals.witchIdle;
             move2Sprite = visuals.witchMove2 != null ? visuals.witchMove2 : move1Sprite;
             attackSprite = visuals.witchAttack != null ? visuals.witchAttack : visuals.witchIdle;
+        }
+
+        protected override void SpawnRangedSpellVisualTowardHero()
+        {
+            if (heroTransform == null)
+                return;
+            int order = spriteRenderer != null ? spriteRenderer.sortingOrder : 100;
+            EnemyCasterSpellVisuals.SpawnNextWitchSpell(
+                transform.position,
+                heroTransform.position,
+                order,
+                ref _witchSpellRotor);
         }
     }
 }

@@ -83,57 +83,36 @@ namespace Dungeon.Magic
 
             MagicSpellEntry entry = spells[equippedIndex];
             Vector2 origin = HeroTransform.position;
-            Vector2 dir = worldTarget - origin;
-            if (dir.sqrMagnitude < 1e-6f)
-                dir = Vector2.right;
 
-            SpawnForEntry(entry, origin, dir, worldTarget);
+            MagicSpellVisualSpawn.Spawn(
+                entry,
+                origin,
+                worldTarget,
+                HeroTransform,
+                spawnOffsetAlongAim,
+                rayMaxLengthTiles,
+                aimSortingOrder);
             return true;
         }
 
-        private void SpawnForEntry(MagicSpellEntry entry, Vector2 heroWorld, Vector2 rawDir, Vector2 cursorWorld)
+        /// <summary>Case-insensitive match on <see cref="MagicSpellEntry.spellId"/> (same ids as Art/Magic file names).</summary>
+        public bool TryGetSpellById(string spellId, out MagicSpellEntry entry)
         {
-            Vector2 dir = rawDir.normalized;
+            entry = null;
+            if (string.IsNullOrEmpty(spellId) || spells == null || spells.Count == 0)
+                return false;
 
-            switch (entry.kind)
+            for (int i = 0; i < spells.Count; i++)
             {
-                case MagicSpellKind.RayBurst:
-                    float maxLen = Mathf.Max(0.5f, rayMaxLengthTiles);
-                    Vector2 rayEnd = cursorWorld;
-                    Vector2 rayVec = rayEnd - heroWorld;
-                    if (rayVec.magnitude > maxLen)
-                        rayEnd = heroWorld + rayVec.normalized * maxLen;
-                    var rayGo = new GameObject($"MagicRay_{entry.spellId}");
-                    rayGo.transform.SetParent(null);
-                    rayGo.transform.position = heroWorld;
-                    var ray = rayGo.AddComponent<MagicRayBurstBehaviour>();
-                    ray.Init(heroWorld, rayEnd, Color.white);
-                    break;
-
-                case MagicSpellKind.AttachedShield:
-                    var shGo = new GameObject($"MagicShield_{entry.spellId}");
-                    shGo.transform.SetParent(null);
-                    var sh = shGo.AddComponent<MagicShieldVisualBehaviour>();
-                    sh.Init(HeroTransform, dir, entry.frames, aimSortingOrder + 5);
-                    break;
-
-                case MagicSpellKind.ProjectileOrb:
-                    SpawnProjectile(entry, heroWorld, dir, VampireEnemyBalance.ThrallMoveSpeedWorldUnits, true);
-                    break;
-
-                case MagicSpellKind.ProjectileFast:
-                default:
-                    SpawnProjectile(entry, heroWorld, dir, VampireEnemyBalance.ThrallMoveSpeedWorldUnits * 2f, false);
-                    break;
+                MagicSpellEntry e = spells[i];
+                if (e != null && string.Equals(e.spellId, spellId, StringComparison.OrdinalIgnoreCase))
+                {
+                    entry = e;
+                    return true;
+                }
             }
-        }
 
-        private void SpawnProjectile(MagicSpellEntry entry, Vector2 heroWorld, Vector2 dirNorm, float speed, bool bounceOnce)
-        {
-            Vector2 spawn = heroWorld + dirNorm * spawnOffsetAlongAim;
-            var go = new GameObject($"MagicProjectile_{entry.spellId}");
-            var proj = go.AddComponent<MagicProjectileBehaviour>();
-            proj.Launch(spawn, dirNorm, speed, bounceOnce, entry.frames, aimSortingOrder + 10);
+            return false;
         }
 
         private void UpdateSpellHotkeys()
@@ -293,7 +272,9 @@ namespace Dungeon.Magic
             if (l.Contains("shield"))
                 return MagicSpellKind.AttachedShield;
             if (l.Contains("spark") || l.Contains("bolt") || l.Contains("fireball") || l.Contains("firebomb")
-                || l.Contains("water blast"))
+                || l.Contains("water blast") || l.Contains("lance") || l.Contains("sling")
+                || l.Contains("missile") || l.Contains("missle") || l.Contains("splash")
+                || l.Contains("lightning"))
                 return MagicSpellKind.ProjectileFast;
             return MagicSpellKind.ProjectileFast;
         }
