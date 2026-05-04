@@ -73,6 +73,10 @@ namespace Dungeon
         private void Start()
         {
             WireGameplayMusic();
+            // Boot / editor play starts with timeScale 0 before GameFlow's IEnumerator Start runs a 2nd frame;
+            // ensure pause menu audio still starts if anything delays that coroutine.
+            if (Time.timeScale < 0.01f)
+                PlayPauseMenuMusicFromStart();
         }
 
         private void Update()
