@@ -20,6 +20,7 @@ namespace Dungeon
         public const int EnemySpriteSortingOrder = 100;
 
         private static readonly List<Vector2Int> CandidateScratch = new List<Vector2Int>(256);
+        private static readonly List<Sprite> IdlePoolScratch = new List<Sprite>(16);
 
         public static void ClearSpawned(Tilemap dungeonTilemap)
         {
@@ -54,21 +55,21 @@ namespace Dungeon
             if (idleSprites == null || !idleSprites.HasAnySprite())
                 return;
 
-            var idlePool = new List<Sprite>(8);
+            IdlePoolScratch.Clear();
             switch (band)
             {
                 case DungeonEnemyRoomBand.Small:
-                    idleSprites.CollectSmallRoomPool(idlePool);
+                    idleSprites.CollectSmallRoomPool(IdlePoolScratch);
                     break;
                 case DungeonEnemyRoomBand.Medium:
-                    idleSprites.CollectMediumRoomPool(idlePool);
+                    idleSprites.CollectMediumRoomPool(IdlePoolScratch);
                     break;
                 case DungeonEnemyRoomBand.Large:
-                    idleSprites.CollectLargeRoomPool(idlePool);
+                    idleSprites.CollectLargeRoomPool(IdlePoolScratch);
                     break;
             }
 
-            if (idlePool.Count == 0)
+            if (IdlePoolScratch.Count == 0)
                 return;
 
             var root = GetOrCreateEnemyRoot(baseTilemap);
@@ -87,7 +88,7 @@ namespace Dungeon
                 var p = CandidateScratch[i];
                 var cell = new Vector3Int(origin.x + p.x, origin.y + p.y, z);
                 Vector3 world = baseTilemap.GetCellCenterWorld(cell);
-                var sprite = idlePool[Random.Range(0, idlePool.Count)];
+                var sprite = IdlePoolScratch[Random.Range(0, IdlePoolScratch.Count)];
                 if (sprite == null)
                     continue;
 

@@ -34,7 +34,7 @@ namespace Dungeon.Magic
                     rayGo.transform.SetParent(null);
                     rayGo.transform.position = new Vector3(originWorld.x, originWorld.y, 0f);
                     var ray = rayGo.AddComponent<MagicRayBurstBehaviour>();
-                    ray.Init(originWorld, rayEnd, Color.white);
+                    ray.Init(originWorld, rayEnd, Color.white, MagicVisualPresentation.RayWidthMultiplier);
                     break;
                 }
 

@@ -14,7 +14,7 @@ namespace Dungeon.Magic
         private float age;
         private Color colorOpaque;
 
-        public void Init(Vector2 startWorld, Vector2 endWorldWorld, Color color)
+        public void Init(Vector2 startWorld, Vector2 endWorldWorld, Color color, float widthScale = 1f)
         {
             age = 0f;
             colorOpaque = color;
@@ -22,7 +22,7 @@ namespace Dungeon.Magic
             Shader sh = Shader.Find("Sprites/Default") ?? Shader.Find("Unlit/Color");
             line = gameObject.AddComponent<LineRenderer>();
             line.positionCount = 2;
-            line.widthMultiplier = width;
+            line.widthMultiplier = width * Mathf.Max(0.01f, widthScale);
             line.sortingOrder = sortingOrder;
             line.useWorldSpace = true;
             line.material = sh != null ? new Material(sh) : new Material(Shader.Find("Hidden/InternalErrorShader"));

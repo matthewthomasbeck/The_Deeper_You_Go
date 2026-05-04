@@ -74,7 +74,11 @@ namespace Dungeon
                 }
             }
 
-            blockerTilemap.RefreshAllTiles();
+            var blockerCollider = blockerTilemap.GetComponent<TilemapCollider2D>();
+            if (blockerCollider != null)
+                blockerCollider.ProcessTilemapChanges();
+            else
+                blockerTilemap.RefreshAllTiles();
         }
 
         /// <summary>Hall trims (rooms_0 / breach caps) use wall colliders whose shapes can eat adjacent corridor walkway; omit physics on those paints when touching logical corridor cells.</summary>
@@ -189,34 +193,26 @@ namespace Dungeon
             return blockerTilemap;
         }
 
+        private static Type _compositeShadowCaster2DType;
+
         private static void TryAddCompositeShadowCaster(GameObject go)
         {
             if (go == null)
                 return;
 
-            if (HasComponentByName(go, "CompositeShadowCaster2D"))
-                return;
-
-            var type = Type.GetType("UnityEngine.Rendering.Universal.CompositeShadowCaster2D, Unity.RenderPipelines.Universal.Runtime");
-            if (type == null)
-                type = Type.GetType("UnityEngine.Rendering.Universal.CompositeShadowCaster2D, Unity.RenderPipelines.Universal.2D.Runtime");
-            if (type == null)
-                return;
-
-            go.AddComponent(type);
-        }
-
-        private static bool HasComponentByName(GameObject go, string typeName)
-        {
-            var components = go.GetComponents<Component>();
-            for (int i = 0; i < components.Length; i++)
+            if (_compositeShadowCaster2DType == null)
             {
-                var c = components[i];
-                if (c != null && c.GetType().Name == typeName)
-                    return true;
+                _compositeShadowCaster2DType = Type.GetType("UnityEngine.Rendering.Universal.CompositeShadowCaster2D, Unity.RenderPipelines.Universal.Runtime");
+                if (_compositeShadowCaster2DType == null)
+                    _compositeShadowCaster2DType = Type.GetType("UnityEngine.Rendering.Universal.CompositeShadowCaster2D, Unity.RenderPipelines.Universal.2D.Runtime");
             }
 
-            return false;
+            if (_compositeShadowCaster2DType == null)
+                return;
+            if (go.GetComponent(_compositeShadowCaster2DType) != null)
+                return;
+
+            go.AddComponent(_compositeShadowCaster2DType);
         }
 
         private static Transform GetOrCreateChild(Transform parent, string childName)

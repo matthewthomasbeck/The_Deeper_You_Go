@@ -46,6 +46,7 @@ namespace Dungeon.Magic
 
             float ang = Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg;
             transform.rotation = Quaternion.Euler(0f, 0f, ang);
+            transform.localScale = Vector3.one * MagicVisualPresentation.SpriteWorldScale;
         }
 
         private void FixedUpdate()

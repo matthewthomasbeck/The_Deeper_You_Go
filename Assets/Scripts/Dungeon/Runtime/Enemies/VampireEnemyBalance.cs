@@ -21,8 +21,8 @@ namespace Dungeon
         /// <summary>Thrall, knight, strongman share this Chebyshev tile aggro radius.</summary>
         public const int MeleeStandardAggroChebyshev = 20;
 
-        /// <summary>Witch only notices the hero within this Chebyshev distance (short).</summary>
-        public const int WitchAggroChebyshev = 5;
+        /// <summary>Witch chase radius; matches melee standard so they pursue across a room (5 was easy to leave by one tile, which looked like “no pathfind / idle forever”).</summary>
+        public const int WitchAggroChebyshev = MeleeStandardAggroChebyshev;
 
         /// <summary>Witch stops to cast when hero is within this distance (matches short-range role).</summary>
         public const int WitchRangedHoldChebyshev = 5;
@@ -33,13 +33,13 @@ namespace Dungeon
         /// <summary>Mage stops and casts when the hero is within this Chebyshev distance (long cast band).</summary>
         public const int MageRangedHoldChebyshev = 10;
 
-        /// <summary>Ranged casters path toward a tile this far from the hero (Chebyshev min).</summary>
+        /// <summary>Legacy comfort-ring pathing (no longer used; casters path to the hero tile like melee).</summary>
         public const int CasterPathfindComfortMinChebyshev = 5;
 
-        /// <summary>Ranged casters path toward a tile at most this far from the hero (Chebyshev max).</summary>
+        /// <summary>Legacy comfort-ring pathing (no longer used).</summary>
         public const int CasterPathfindComfortMaxChebyshev = 10;
 
-        /// <summary>Larger interval than melee reduces comfort-goal probing cost when multiple casters are active.</summary>
+        /// <summary>Larger interval than melee reduces repath cost when multiple casters are active.</summary>
         public const float CasterRepathIntervalSeconds = 0.55f;
 
         /// <summary>

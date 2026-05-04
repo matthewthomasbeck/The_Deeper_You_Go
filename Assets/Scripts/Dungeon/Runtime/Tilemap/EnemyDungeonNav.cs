@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -11,6 +12,21 @@ namespace Dungeon
     public static class EnemyDungeonNav
     {
         private static readonly List<Vector2Int> PathProbeScratch = new List<Vector2Int>(256);
+        private static readonly List<Vector2Int> ComfortGoalCandidatesScratch = new List<Vector2Int>(256);
+
+        private static Vector2Int[] _bfsCameFrom;
+        private static bool[] _bfsVisited;
+        private static readonly Queue<Vector2Int> _bfsQueue = new Queue<Vector2Int>(512);
+        private static readonly List<Vector2Int> _bfsRev = new List<Vector2Int>(128);
+
+        private static void EnsureBfsBuffers(int cellCount)
+        {
+            if (_bfsCameFrom == null || _bfsCameFrom.Length < cellCount)
+            {
+                _bfsCameFrom = new Vector2Int[cellCount];
+                _bfsVisited = new bool[cellCount];
+            }
+        }
 
         private static readonly Vector2Int[] CardinalOffsets =
         {
@@ -19,6 +35,54 @@ namespace Dungeon
             new Vector2Int(0, 1),
             new Vector2Int(0, -1),
         };
+        /// <summary>
+        /// The hero can stand on void, off the painted map, or on tiles the logical grid marks unwalkable; BFS needs a nearby walkable cell.
+        /// </summary>
+        public static bool TryGetNearestWalkableGoalFromMapCell(
+            RoomGrid grid,
+            Tilemap baseTilemap,
+            Vector3Int origin,
+            RoomTilesetDefinition tileset,
+            Vector3Int heroOrAnchorMapCell,
+            out Vector2Int goalGrid)
+        {
+            goalGrid = default;
+            if (grid == null || baseTilemap == null || tileset == null)
+                return false;
+
+            int rawGx = heroOrAnchorMapCell.x - origin.x;
+            int rawGy = heroOrAnchorMapCell.y - origin.y;
+            int ax = Mathf.Clamp(rawGx, 0, grid.width - 1);
+            int ay = Mathf.Clamp(rawGy, 0, grid.height - 1);
+
+            if (IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, ax, ay))
+            {
+                goalGrid = new Vector2Int(ax, ay);
+                return true;
+            }
+
+            int maxRing = Mathf.Min(28, Mathf.Max(grid.width, grid.height));
+            for (int r = 1; r <= maxRing; r++)
+            {
+                for (int dx = -r; dx <= r; dx++)
+                {
+                    for (int dy = -r; dy <= r; dy++)
+                    {
+                        if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) != r)
+                            continue;
+                        int gx = ax + dx;
+                        int gy = ay + dy;
+                        if (!IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, gx, gy))
+                            continue;
+                        goalGrid = new Vector2Int(gx, gy);
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         public static bool IsCellWalkableForEnemy(RoomGrid grid, Tilemap baseTilemap, Vector3Int origin, RoomTilesetDefinition tileset, int gx, int gy)
         {
             if (grid == null || baseTilemap == null || tileset == null)
@@ -60,33 +124,42 @@ namespace Dungeon
             pathOut?.Clear();
             if (grid == null || pathOut == null || baseTilemap == null || tileset == null)
                 return false;
-            if (!IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, start.x, start.y)
-                || !IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, goal.x, goal.y))
+
+            Vector2Int s = start;
+            Vector2Int g = goal;
+            if (!IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, s.x, s.y))
                 return false;
 
-            if (start == goal)
+            if (!IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, g.x, g.y))
             {
-                pathOut.Add(start);
+                var anchorG = new Vector3Int(origin.x + g.x, origin.y + g.y, origin.z);
+                if (!TryGetNearestWalkableGoalFromMapCell(grid, baseTilemap, origin, tileset, anchorG, out g))
+                    return false;
+            }
+
+            if (s == g)
+            {
+                pathOut.Add(s);
                 return true;
             }
 
             int cells = grid.width * grid.height;
-            var cameFrom = new Vector2Int[cells];
-            var visited = new bool[cells];
-            var q = new Queue<Vector2Int>(256);
+            EnsureBfsBuffers(cells);
+            Array.Clear(_bfsVisited, 0, cells);
+            _bfsQueue.Clear();
 
             int Index(int x, int y) => y * grid.width + x;
 
-            int startIdx = Index(start.x, start.y);
-            visited[startIdx] = true;
-            cameFrom[startIdx] = start;
-            q.Enqueue(start);
+            int startIdx = Index(s.x, s.y);
+            _bfsVisited[startIdx] = true;
+            _bfsCameFrom[startIdx] = s;
+            _bfsQueue.Enqueue(s);
 
             bool found = false;
-            while (q.Count > 0)
+            while (_bfsQueue.Count > 0)
             {
-                var cur = q.Dequeue();
-                if (cur == goal)
+                var cur = _bfsQueue.Dequeue();
+                if (cur == g)
                 {
                     found = true;
                     break;
@@ -98,30 +171,30 @@ namespace Dungeon
                     if (!IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, n.x, n.y))
                         continue;
                     int ni = Index(n.x, n.y);
-                    if (visited[ni])
+                    if (_bfsVisited[ni])
                         continue;
-                    visited[ni] = true;
-                    cameFrom[ni] = cur;
-                    q.Enqueue(n);
+                    _bfsVisited[ni] = true;
+                    _bfsCameFrom[ni] = cur;
+                    _bfsQueue.Enqueue(n);
                 }
             }
 
             if (!found)
                 return false;
 
-            var rev = new List<Vector2Int>(64);
-            var p = goal;
+            _bfsRev.Clear();
+            var p = g;
             while (true)
             {
-                rev.Add(p);
-                if (p == start)
+                _bfsRev.Add(p);
+                if (p == s)
                     break;
                 int pi = Index(p.x, p.y);
-                p = cameFrom[pi];
+                p = _bfsCameFrom[pi];
             }
 
-            for (int i = rev.Count - 1; i >= 0; i--)
-                pathOut.Add(rev[i]);
+            for (int i = _bfsRev.Count - 1; i >= 0; i--)
+                pathOut.Add(_bfsRev[i]);
 
             return true;
         }
@@ -149,7 +222,7 @@ namespace Dungeon
             comfortMinCheb = Mathf.Max(1, comfortMinCheb);
             comfortMaxCheb = Mathf.Max(comfortMinCheb, comfortMaxCheb);
 
-            var candidates = new List<Vector2Int>(128);
+            ComfortGoalCandidatesScratch.Clear();
             for (int dx = -comfortMaxCheb; dx <= comfortMaxCheb; dx++)
             {
                 for (int dy = -comfortMaxCheb; dy <= comfortMaxCheb; dy++)
@@ -161,11 +234,11 @@ namespace Dungeon
                     int gy = heroGy + dy;
                     if (!IsCellWalkableForEnemy(grid, baseTilemap, origin, tileset, gx, gy))
                         continue;
-                    candidates.Add(new Vector2Int(gx, gy));
+                    ComfortGoalCandidatesScratch.Add(new Vector2Int(gx, gy));
                 }
             }
 
-            candidates.Sort((a, b) =>
+            ComfortGoalCandidatesScratch.Sort((a, b) =>
             {
                 int da = Mathf.Max(Mathf.Abs(a.x - selfGx), Mathf.Abs(a.y - selfGy));
                 int db = Mathf.Max(Mathf.Abs(b.x - selfGx), Mathf.Abs(b.y - selfGy));
@@ -174,14 +247,14 @@ namespace Dungeon
 
             // Cap probes: each probe runs a full BFS; brute-forcing hundreds of candidates per frame nukes FPS.
             const int MaxComfortGoalPathProbes = 24;
-            int probeCount = Mathf.Min(candidates.Count, MaxComfortGoalPathProbes);
+            int probeCount = Mathf.Min(ComfortGoalCandidatesScratch.Count, MaxComfortGoalPathProbes);
 
             var self = new Vector2Int(selfGx, selfGy);
             for (int i = 0; i < probeCount; i++)
             {
-                if (!TryFindPathForEnemy(grid, baseTilemap, origin, tileset, self, candidates[i], PathProbeScratch))
+                if (!TryFindPathForEnemy(grid, baseTilemap, origin, tileset, self, ComfortGoalCandidatesScratch[i], PathProbeScratch))
                     continue;
-                goal = candidates[i];
+                goal = ComfortGoalCandidatesScratch[i];
                 return true;
             }
 

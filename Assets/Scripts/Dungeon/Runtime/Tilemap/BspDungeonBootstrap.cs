@@ -12,6 +12,9 @@ namespace Dungeon
     [DefaultExecutionOrder(-100)]
     public class BspDungeonBootstrap : MonoBehaviour
     {
+        /// <summary>Last awake bootstrap; avoids repeated <see cref="Object.FindFirstObjectByType{T}"/> from many enemies.</summary>
+        public static BspDungeonBootstrap Instance { get; private set; }
+
         [Tooltip("Empty/FloorWood required; wall slots: left rooms_8, right rooms_7, bottom rooms_5, top rooms_0 + wallTopCap rooms_6.")]
         public RoomTilesetDefinition tileset;
 
@@ -116,6 +119,17 @@ namespace Dungeon
             parameters.mapHeight = Mathf.Max(parameters.mapHeight, parameters.minimumDungeonHeight);
         }
 #endif
+
+        private void Awake()
+        {
+            Instance = this;
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
+        }
 
         private void Start()
         {

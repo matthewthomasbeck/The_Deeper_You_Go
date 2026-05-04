@@ -15,6 +15,9 @@ namespace Dungeon
     [RequireComponent(typeof(Rigidbody2D))]
     public class HeroController2D : MonoBehaviour
     {
+        /// <summary>Set in <see cref="OnEnable"/> so enemy AI can resolve the player without scanning every <see cref="ActorBase"/>.</summary>
+        public static Transform ActiveTransform { get; private set; }
+
         [Header("Movement")]
         public float moveSpeedUnitsPerSecond = 5f;
 
@@ -73,6 +76,8 @@ namespace Dungeon
             hero = GetComponent<ActorBase>();
             rb = GetComponent<Rigidbody2D>();
             magicCaster = GetComponent<HeroMagicCaster>();
+            if (hero != null)
+                hero.actorKind = ActorKind.Hero;
 
             if (worldCamera == null)
                 worldCamera = Camera.main;
@@ -82,6 +87,17 @@ namespace Dungeon
             LoadHeroSpriteSets();
             ClampHeroIndex();
             ApplyCurrentHeroFrame(0);
+        }
+
+        private void OnEnable()
+        {
+            ActiveTransform = transform;
+        }
+
+        private void OnDisable()
+        {
+            if (ActiveTransform == transform)
+                ActiveTransform = null;
         }
 
 

@@ -18,6 +18,9 @@ namespace Dungeon.Magic
     [DisallowMultipleComponent]
     public class HeroMagicCaster : MonoBehaviour
     {
+        /// <summary>Registered in <see cref="OnEnable"/> for enemy spell VFX lookup.</summary>
+        public static HeroMagicCaster Instance { get; private set; }
+
         [SerializeField] private Camera worldCamera;
 
         [Tooltip("Child transform rotated toward cursor; SpriteRenderer picked up or created.")]
@@ -39,6 +42,44 @@ namespace Dungeon.Magic
         [SerializeField] private bool autoPopulateWhenEmptyInEditor = true;
 
         private Transform HeroTransform => transform;
+
+        /// <summary>True when serialized spell entries exist (enemy VFX and hero casting need this).</summary>
+        public bool HasSpellLibrary => spells != null && spells.Count > 0;
+
+        private void OnEnable()
+        {
+            if (HasSpellLibrary)
+                Instance = this;
+            else if (Instance == null)
+                Instance = this;
+        }
+
+        private void OnDisable()
+        {
+            if (Instance != this)
+                return;
+            Instance = null;
+        }
+
+        /// <summary>Resolves a caster with a populated spell list for witch/mage VFX (handles inactive hero or empty Instance).</summary>
+        public static HeroMagicCaster ResolveForEnemySpellVfx()
+        {
+            if (Instance != null && Instance.HasSpellLibrary)
+                return Instance;
+
+            HeroMagicCaster single = UnityEngine.Object.FindFirstObjectByType<HeroMagicCaster>(FindObjectsInactive.Include);
+            if (single != null && single.HasSpellLibrary)
+                return single;
+
+            HeroMagicCaster[] all = UnityEngine.Object.FindObjectsByType<HeroMagicCaster>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i].HasSpellLibrary)
+                    return all[i];
+            }
+
+            return single;
+        }
 
         private void Awake()
         {
@@ -157,6 +198,7 @@ namespace Dungeon.Magic
 
             aimSpriteRenderer.enabled = true;
             aimSpriteRenderer.sprite = entry.frames[0];
+            aimSpriteRenderer.transform.localScale = Vector3.one * MagicVisualPresentation.SpriteWorldScale;
         }
 
         private Vector2 ScreenToWorldOnHeroPlane(Vector2 screenPx)

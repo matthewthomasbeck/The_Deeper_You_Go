@@ -19,13 +19,14 @@ namespace Dungeon
         public float repathIntervalSeconds = 0.35f;
 
         [Header("Melee")]
-        public float attackRangeWorldUnits = 0.5f;
+        [Tooltip("Chebyshev grid distance to the hero (same tile = 0, cardinally adjacent = 1). World-radius 0.5 was smaller than adjacent 1×1 cell spacing, so melee often stopped after the first exchange.")]
+        [Min(0)] public int meleeStrikeChebyshevTiles = 1;
         [Min(1)] public int attackDamage = VampireEnemyBalance.ThrallAttackDamageHearts;
         public float attackClipSeconds = 0.35f;
         [Tooltip("Minimum time before another attack after one completes.")]
         public float attackCooldownSeconds = 0.5f;
-        [Tooltip("Must be this close to the current tile center before a melee swing (prevents attacking while sliding between cells).")]
-        public float stillToAttackCellCenterEpsilon = 0.1f;
+        [Tooltip("Must be this close to the current tile center before melee/caster logic runs (prevents attacking while sliding between cells).")]
+        public float stillToAttackCellCenterEpsilon = 0.14f;
         [Tooltip("After each attack clip ends, snap to tilemap cell center so pathfinding and still-check stay consistent.")]
         public bool snapToCellCenterWhenAttackEnds = true;
 
@@ -81,6 +82,7 @@ namespace Dungeon
             damageScratch.amount = attackDamage;
             if (selfActor != null)
                 selfActor.SetCombatMaxHealth(VampireEnemyBalance.ComputeEnemyMaxHealthFromAttackDamage(attackDamage));
+            meleeStrikeChebyshevTiles = Mathf.Max(1, meleeStrikeChebyshevTiles);
         }
 
         private void OnDestroy()
@@ -129,10 +131,14 @@ namespace Dungeon
                 return false;
 
             attackAnimTimer -= dt;
+            if (!float.IsFinite(attackAnimTimer))
+                attackAnimTimer = 0f;
             if (attackAnimTimer <= 0f)
             {
                 inAttackAnim = false;
                 attackCooldownTimer = Mathf.Max(0f, attackCooldownSeconds);
+                if (!float.IsFinite(attackCooldownTimer))
+                    attackCooldownTimer = 0f;
                 ApplySpriteAfterAttack();
                 if (snapToCellCenterWhenAttackEnds)
                 {
@@ -149,22 +155,47 @@ namespace Dungeon
 
         protected void CacheDungeonAndHero()
         {
-            dungeon = Object.FindFirstObjectByType<BspDungeonBootstrap>();
-            var heroController = Object.FindFirstObjectByType<HeroController2D>();
-            if (heroController != null)
-                heroTransform = heroController.transform;
-            else
+            dungeon = BspDungeonBootstrap.Instance != null ? BspDungeonBootstrap.Instance : Object.FindFirstObjectByType<BspDungeonBootstrap>();
+
+            if (HeroController2D.ActiveTransform != null)
             {
-                var actors = Object.FindObjectsByType<ActorBase>(FindObjectsSortMode.None);
-                for (int i = 0; i < actors.Length; i++)
+                heroTransform = HeroController2D.ActiveTransform;
+                return;
+            }
+
+            HeroController2D heroController = Object.FindFirstObjectByType<HeroController2D>(FindObjectsInactive.Include);
+            if (heroController == null)
+            {
+                HeroController2D[] heroes = Object.FindObjectsByType<HeroController2D>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+                if (heroes != null && heroes.Length > 0)
+                    heroController = heroes[0];
+            }
+
+            if (heroController != null)
+            {
+                heroTransform = heroController.transform;
+                return;
+            }
+
+            GameObject playerGo = GameObject.Find("Player");
+            if (playerGo != null)
+            {
+                var hc = playerGo.GetComponent<HeroController2D>();
+                if (hc != null)
                 {
-                    if (actors[i].actorKind == ActorKind.Hero)
-                    {
-                        heroTransform = actors[i].transform;
-                        break;
-                    }
+                    heroTransform = hc.transform;
+                    return;
+                }
+
+                var ab = playerGo.GetComponentInChildren<ActorBase>(true);
+                if (ab != null)
+                {
+                    heroTransform = ab.transform;
+                    return;
                 }
             }
+
+            heroTransform = null;
         }
 
         protected virtual void Update()
@@ -177,8 +208,7 @@ namespace Dungeon
             if (ProcessAttackAnimationTick(dt))
                 return;
 
-            if (attackCooldownTimer > 0f)
-                attackCooldownTimer -= dt;
+            TickDownAttackCooldown(dt);
 
             if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null || dungeon.tileset == null)
             {
@@ -193,11 +223,11 @@ namespace Dungeon
             var tileset = dungeon.tileset;
 
             Vector2 heroWorld = heroTransform.position;
-            Vector2 selfWorld = transform.position;
-            float worldDist = Vector2.Distance(heroWorld, selfWorld);
 
             var heroCell = tilemap.WorldToCell(heroWorld);
-            var selfCell = tilemap.WorldToCell(selfWorld);
+            heroCell.z = origin.z;
+            var selfCell = tilemap.WorldToCell(transform.position);
+            selfCell.z = origin.z;
             int heroGx = heroCell.x - origin.x;
             int heroGy = heroCell.y - origin.y;
             int selfGx = selfCell.x - origin.x;
@@ -212,16 +242,10 @@ namespace Dungeon
                 return;
             }
 
-            if (worldDist <= attackRangeWorldUnits && attackCooldownTimer <= 0f)
+            if (cheb <= meleeStrikeChebyshevTiles && attackCooldownTimer <= 0f)
             {
-                Vector3 selfCellCenter = tilemap.GetCellCenterWorld(selfCell);
-                var settleTarget = new Vector3(selfCellCenter.x, selfCellCenter.y, transform.position.z);
-                float offCell = Vector2.Distance(
-                    new Vector2(transform.position.x, transform.position.y),
-                    new Vector2(selfCellCenter.x, selfCellCenter.y));
-                if (offCell > stillToAttackCellCenterEpsilon)
+                if (!EnsureSettledOnOwnCellCenterForGrid(tilemap, dt))
                 {
-                    transform.position = Vector3.MoveTowards(transform.position, settleTarget, moveSpeedWorldUnits * dt);
                     UpdateFacing(heroWorld.x - transform.position.x);
                     ApplySpriteWhenIdleChasing();
                     return;
@@ -308,6 +332,54 @@ namespace Dungeon
             transform.position = new Vector3(center.x, center.y, transform.position.z);
         }
 
+        /// <summary>
+        /// Aligns the enemy to the centre of its current tile. Snaps hard when very close to avoid oscillating
+        /// between two cells at boundaries (which could block attacks and pathing forever).
+        /// </summary>
+        /// <returns>True when aligned enough for grid attack / path logic.</returns>
+        protected bool EnsureSettledOnOwnCellCenterForGrid(Tilemap tilemap, float dt)
+        {
+            if (tilemap == null)
+                return true;
+            var selfCell = tilemap.WorldToCell(transform.position);
+            Vector3 selfCellCenter = tilemap.GetCellCenterWorld(selfCell);
+            float offCell = Vector2.Distance(
+                new Vector2(transform.position.x, transform.position.y),
+                new Vector2(selfCellCenter.x, selfCellCenter.y));
+            if (offCell <= stillToAttackCellCenterEpsilon)
+                return true;
+            if (offCell < 0.55f)
+            {
+                SnapToCellCenter(tilemap);
+                return true;
+            }
+
+            transform.position = Vector3.MoveTowards(
+                transform.position,
+                new Vector3(selfCellCenter.x, selfCellCenter.y, transform.position.z),
+                moveSpeedWorldUnits * dt);
+            return false;
+        }
+
+        protected static ActorBase ResolveHeroActor(Transform heroRoot)
+        {
+            if (heroRoot == null)
+                return null;
+            var a = heroRoot.GetComponent<ActorBase>();
+            if (a != null)
+                return a;
+            return heroRoot.GetComponentInChildren<ActorBase>(true);
+        }
+
+        protected void TickDownAttackCooldown(float dt)
+        {
+            if (attackCooldownTimer <= 0f)
+                return;
+            attackCooldownTimer -= dt;
+            if (!float.IsFinite(attackCooldownTimer) || attackCooldownTimer < 0f)
+                attackCooldownTimer = 0f;
+        }
+
         /// <summary> Called once when the melee attack clip finishes (after damage was applied). </summary>
         protected virtual void OnAttackAnimationCompleted()
         {
@@ -333,7 +405,7 @@ namespace Dungeon
         {
             pathScratch.Clear();
 
-            var heroActor = heroTransform.GetComponent<ActorBase>();
+            var heroActor = ResolveHeroActor(heroTransform);
             if (heroActor == null || heroActor.IsDead)
                 return;
 
@@ -341,6 +413,8 @@ namespace Dungeon
                 spriteRenderer.sprite = attackSprite;
             inAttackAnim = true;
             attackAnimTimer = Mathf.Max(0.05f, attackClipSeconds);
+            if (!float.IsFinite(attackAnimTimer))
+                attackAnimTimer = 0.05f;
 
             damageScratch.amount = attackDamage;
             heroActor.ApplyStatusEffect(damageScratch);
@@ -604,7 +678,7 @@ namespace Dungeon
     }
 
     /// <summary>
-    /// Pathfinds toward a tile 5–10 Chebyshev from the hero while outside spell range; settles on tile centers; casts when ≤ <see cref="rangedHoldChebyshevTiles"/>.
+    /// Paths on the same grid as melee toward the hero tile while outside spell range; settles on tile centers; casts when ≤ <see cref="rangedHoldChebyshevTiles"/>.
     /// </summary>
     public class VampireRangedCasterBehaviour : VampireThrallBehaviour
     {
@@ -636,8 +710,7 @@ namespace Dungeon
             if (ProcessAttackAnimationTick(dt))
                 return;
 
-            if (attackCooldownTimer > 0f)
-                attackCooldownTimer -= dt;
+            TickDownAttackCooldown(dt);
 
             if (dungeon == null || dungeon.tilemap == null || dungeon.LastGeneratedFloorGrid == null || heroTransform == null || dungeon.tileset == null)
             {
@@ -652,7 +725,9 @@ namespace Dungeon
             var tileset = dungeon.tileset;
 
             var heroCell = tilemap.WorldToCell((Vector2)heroTransform.position);
+            heroCell.z = origin.z;
             var selfCell = tilemap.WorldToCell(transform.position);
+            selfCell.z = origin.z;
             int heroGx = heroCell.x - origin.x;
             int heroGy = heroCell.y - origin.y;
             int selfGx = selfCell.x - origin.x;
@@ -667,24 +742,19 @@ namespace Dungeon
                 return;
             }
 
-            Vector3 selfCellCenter = tilemap.GetCellCenterWorld(selfCell);
-            var settleTarget = new Vector3(selfCellCenter.x, selfCellCenter.y, transform.position.z);
-            float offCell = Vector2.Distance(
-                new Vector2(transform.position.x, transform.position.y),
-                new Vector2(selfCellCenter.x, selfCellCenter.y));
-            if (offCell > stillToAttackCellCenterEpsilon)
-            {
-                transform.position = Vector3.MoveTowards(transform.position, settleTarget, moveSpeedWorldUnits * dt);
-                if (idleSprite != null)
-                    spriteRenderer.sprite = idleSprite;
-                return;
-            }
-
+            // Cast while in range even if not perfectly snapped to tile centre; settle only matters for grid path steps.
             if (cheb <= rangedHoldChebyshevTiles)
             {
                 if (attackCooldownTimer <= 0f)
                     TryRangedCast();
                 else if (idleSprite != null && !inAttackAnim)
+                    spriteRenderer.sprite = idleSprite;
+                return;
+            }
+
+            if (!EnsureSettledOnOwnCellCenterForGrid(tilemap, dt))
+            {
+                if (idleSprite != null)
                     spriteRenderer.sprite = idleSprite;
                 return;
             }
@@ -701,20 +771,7 @@ namespace Dungeon
             {
                 repathTimer = repathIntervalSeconds;
                 var start = new Vector2Int(selfGx, selfGy);
-                Vector2Int goal;
-                if (!EnemyDungeonNav.TryPickCasterComfortGoal(
-                        grid,
-                        tilemap,
-                        origin,
-                        tileset,
-                        heroGx,
-                        heroGy,
-                        selfGx,
-                        selfGy,
-                        VampireEnemyBalance.CasterPathfindComfortMinChebyshev,
-                        VampireEnemyBalance.CasterPathfindComfortMaxChebyshev,
-                        out goal))
-                    goal = new Vector2Int(heroGx, heroGy);
+                var goal = new Vector2Int(heroGx, heroGy);
 
                 if (!EnemyDungeonNav.TryFindPathForEnemy(grid, tilemap, origin, tileset, start, goal, pathScratch))
                 {
@@ -757,7 +814,7 @@ namespace Dungeon
         {
             pathScratch.Clear();
 
-            var heroActor = heroTransform.GetComponent<ActorBase>();
+            var heroActor = ResolveHeroActor(heroTransform);
             if (heroActor == null || heroActor.IsDead)
                 return;
 
@@ -765,6 +822,8 @@ namespace Dungeon
                 spriteRenderer.sprite = attackSprite;
             inAttackAnim = true;
             attackAnimTimer = Mathf.Max(0.05f, attackClipSeconds);
+            if (!float.IsFinite(attackAnimTimer))
+                attackAnimTimer = 0.05f;
 
             damageScratch.amount = attackDamage;
             heroActor.ApplyStatusEffect(damageScratch);

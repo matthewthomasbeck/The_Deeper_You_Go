@@ -56,7 +56,7 @@ namespace Dungeon.Magic
             if (pool == null || pool.Length == 0)
                 return;
 
-            var lib = Object.FindFirstObjectByType<HeroMagicCaster>();
+            HeroMagicCaster lib = HeroMagicCaster.ResolveForEnemySpellVfx();
             if (lib == null)
                 return;
 
