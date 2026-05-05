@@ -18,6 +18,21 @@ namespace Dungeon
 
         public const int KnightAttackDamageHearts = StrongmanAttackDamageHearts * 2;
 
+        /// <summary>Mage/witch omni volley damage (2× prior default thrall-tier caster damage).</summary>
+        public const int RangedCasterAttackDamageHearts = ThrallAttackDamageHearts * 2;
+
+        /// <summary>
+        /// Multiplier on legacy melee slack (<see cref="MeleeEnemyLegacySnapIfWithinWorldUnits"/>, settle epsilon on thralls).
+        /// Smaller = enemy must sit nearer its tile center before swinging, so hits match tight melee.
+        /// </summary>
+        public const float MeleeEnemyAttackReachTightenScale = 0.3f;
+
+        /// <summary>Original snap gate in <see cref="VampireThrallBehaviour"/> before tighten scale.</summary>
+        public const float MeleeEnemyLegacySnapIfWithinWorldUnits = 0.55f;
+
+        public static float MeleeEnemySnapIfWithinWorldUnits =>
+            MeleeEnemyLegacySnapIfWithinWorldUnits * MeleeEnemyAttackReachTightenScale;
+
         /// <summary>Thrall, knight, strongman share this Chebyshev tile aggro radius.</summary>
         public const int MeleeStandardAggroChebyshev = 20;
 

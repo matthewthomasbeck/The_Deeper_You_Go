@@ -288,7 +288,7 @@ namespace Dungeon
             isDead = true;
 
             if (actorKind == ActorKind.Npc && npcAlignment == NpcAlignment.Bad)
-                GameRunScore.RegisterEnemyKill();
+                GameRunScore.RegisterEnemyKill(GameRunScore.ResolveHostileNpcKillPoints(gameObject));
 
             if (inventory != null)
                 inventory.drop_item(this);

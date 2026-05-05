@@ -83,6 +83,7 @@ namespace Dungeon
             if (selfActor != null)
                 selfActor.SetCombatMaxHealth(VampireEnemyBalance.ComputeEnemyMaxHealthFromAttackDamage(attackDamage));
             meleeStrikeChebyshevTiles = Mathf.Max(1, meleeStrikeChebyshevTiles);
+            stillToAttackCellCenterEpsilon *= VampireEnemyBalance.MeleeEnemyAttackReachTightenScale;
         }
 
         private void OnDestroy()
@@ -348,7 +349,7 @@ namespace Dungeon
                 new Vector2(selfCellCenter.x, selfCellCenter.y));
             if (offCell <= stillToAttackCellCenterEpsilon)
                 return true;
-            if (offCell < 0.55f)
+            if (offCell < VampireEnemyBalance.MeleeEnemySnapIfWithinWorldUnits)
             {
                 SnapToCellCenter(tilemap);
                 return true;
@@ -836,6 +837,12 @@ namespace Dungeon
     {
         private int _mageSpellRotor;
 
+        protected override void Awake()
+        {
+            attackDamage = VampireEnemyBalance.RangedCasterAttackDamageHearts;
+            base.Awake();
+        }
+
         protected override void ConfigureSprites(DungeonEnemyIdleSprites visuals)
         {
             if (visuals == null)
@@ -861,6 +868,12 @@ namespace Dungeon
     public class VampireWitchBehaviour : VampireRangedCasterBehaviour
     {
         private int _witchSpellRotor;
+
+        protected override void Awake()
+        {
+            attackDamage = VampireEnemyBalance.RangedCasterAttackDamageHearts;
+            base.Awake();
+        }
 
         protected override void ConfigureSprites(DungeonEnemyIdleSprites visuals)
         {

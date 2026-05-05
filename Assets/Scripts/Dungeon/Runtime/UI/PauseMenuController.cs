@@ -98,11 +98,7 @@ namespace Dungeon
 
         public void CycleHeroAppearance()
         {
-            var hero = UnityEngine.Object.FindFirstObjectByType<HeroController2D>();
-            if (hero == null)
-                return;
-            int count = Mathf.Max(1, hero.heroCount);
-            hero.heroIndex = (hero.heroIndex + 1) % count;
+            HeroController2D.CycleFirstHeroAppearanceInScene();
         }
     }
 }

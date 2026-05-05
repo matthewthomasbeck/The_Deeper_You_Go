@@ -110,6 +110,10 @@ namespace Dungeon
         public bool spawnPlayerInRoomOnGenerate = true;
         public string playerObjectName = "Player";
 
+        [Header("Companion dog")]
+        [Tooltip("Spawn the dog-idle tileset companion after the player; it follows and bites enemies near you.")]
+        public bool spawnDogCompanion = true;
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
@@ -257,6 +261,7 @@ namespace Dungeon
             }
 
             SpawnPlayerInRoom(floorGrid);
+            CompanionDogBehaviour.SpawnOrRespawn(this, GameObject.Find(playerObjectName));
             FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 
             if (verboseLogs)

@@ -394,8 +394,37 @@ namespace Dungeon
             if (headSets == null || legsSets == null || torsoSets == null)
                 return;
 
+            ApplyCurrentHeroFrame(ComputeAnimationFrameIndex());
+        }
+
+        /// <summary>Re-apply part sprites after <see cref="heroIndex"/> changes while paused (<see cref="GamePauseState"/> skips <see cref="UpdateHeroAnimation"/>).</summary>
+        public void RefreshHeroSpritesAfterAppearanceChange()
+        {
+            if (headSets == null || legsSets == null || torsoSets == null)
+                return;
+            ApplyCurrentHeroFrame(ComputeAnimationFrameIndex());
+        }
+
+        public void CycleToNextHeroAppearance()
+        {
+            int count = Mathf.Max(1, heroCount);
+            heroIndex = (heroIndex + 1) % count;
+            RefreshHeroSpritesAfterAppearanceChange();
+        }
+
+        /// <summary>Used by UI/pause code that is not on the hero object (e.g. <see cref="GameFlowController"/>).</summary>
+        public static void CycleFirstHeroAppearanceInScene()
+        {
+            var hero = Object.FindFirstObjectByType<HeroController2D>();
+            if (hero == null)
+                return;
+            hero.CycleToNextHeroAppearance();
+        }
+
+        private int ComputeAnimationFrameIndex()
+        {
             bool isMoving = moveInput.sqrMagnitude > 0.0001f;
-            int frameIndex = 0; // idle
+            int frameIndex = 0;
 
             if (isMoving)
             {
@@ -404,7 +433,6 @@ namespace Dungeon
                 float t = runTimerSeconds % cycle;
                 bool firstHalf = t < (cycle * 0.5f);
 
-                // requested behavior: left/down use left frames, right/up use right frames
                 bool useLeftFrames = moveInput.x < -0.01f || (Mathf.Abs(moveInput.x) <= 0.01f && moveInput.y < -0.01f);
                 if (useLeftFrames)
                     frameIndex = firstHalf ? 3 : 4;
@@ -416,7 +444,7 @@ namespace Dungeon
                 runTimerSeconds = 0f;
             }
 
-            ApplyCurrentHeroFrame(frameIndex);
+            return frameIndex;
         }
 
         private void ApplyCurrentHeroFrame(int frameIndex)

@@ -173,6 +173,9 @@ namespace Dungeon
 
         private void Update()
         {
+            if (WasHeroAppearanceCyclePressed())
+                HeroController2D.CycleFirstHeroAppearanceInScene();
+
             if (!WasPauseTogglePressed())
                 return;
 
@@ -194,6 +197,15 @@ namespace Dungeon
             return Keyboard.current != null && Keyboard.current.pKey.wasPressedThisFrame;
 #else
             return Input.GetKeyDown(KeyCode.P);
+#endif
+        }
+
+        private static bool WasHeroAppearanceCyclePressed()
+        {
+#if ENABLE_INPUT_SYSTEM
+            return Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame;
+#else
+            return Input.GetKeyDown(KeyCode.C);
 #endif
         }
 

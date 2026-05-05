@@ -14,6 +14,8 @@ namespace Dungeon.Magic
 {
     /// <summary>
     /// Equipped spells aim at the mouse cursor; right-click casts (wired from <see cref="HeroController2D"/>).
+    /// The full <see cref="spells"/> list is the library; <see cref="ownedSpellIds"/> is what the player has unlocked.
+    /// Chests add spells to owned (preferring new ids); Space / [ / ] cycle equipped spell among owned only.
     /// Spell list auto-fills from <c>Assets/Art/Magic</c> in the editor when empty.
     /// </summary>
     [DisallowMultipleComponent]
@@ -38,6 +40,12 @@ namespace Dungeon.Magic
         [SerializeField] private List<MagicSpellEntry> spells = new List<MagicSpellEntry>();
 
         [SerializeField] private int equippedIndex;
+
+        [Tooltip("Spells the player has collected (ids match MagicSpellEntry.spellId / Art/Magic file names).")]
+        [SerializeField] private List<string> ownedSpellIds = new List<string>();
+
+        [Tooltip("Index into ownedSpellIds for the spell currently equipped.")]
+        [SerializeField] private int equippedOwnedSlot;
 
         [Tooltip("Editor / editor play mode: fills spell list from Assets/Art/Magic when empty.")]
         [SerializeField] private bool autoPopulateWhenEmptyInEditor = true;
@@ -99,6 +107,8 @@ namespace Dungeon.Magic
                 PopulateSpellsFromMagicFolder();
 #endif
             equippedIndex = Mathf.Clamp(equippedIndex, 0, Mathf.Max(0, spells.Count - 1));
+            EnsureOwnedLists();
+            SyncEquippedLibraryIndex();
         }
 
         private void Start()
@@ -108,8 +118,10 @@ namespace Dungeon.Magic
                 PopulateSpellsFromMagicFolder();
 #endif
             equippedIndex = Mathf.Clamp(equippedIndex, 0, Mathf.Max(0, spells.Count - 1));
+            EnsureOwnedLists();
             if (Application.isPlaying)
                 TryEquipRandomElementalStarter();
+            SyncEquippedLibraryIndex();
         }
 
         private void Update()
@@ -126,6 +138,7 @@ namespace Dungeon.Magic
         {
             if (worldCamera == null)
                 worldCamera = Camera.main;
+            SyncEquippedLibraryIndex();
             if (spells.Count == 0 || equippedIndex < 0 || equippedIndex >= spells.Count)
                 return false;
 
@@ -156,44 +169,207 @@ namespace Dungeon.Magic
             spellDamageMax = Mathf.Max(spellDamageMin, maxInclusive);
         }
 
-        /// <summary>Removes chest overlay, sets damage band and equips a random spell from that tier pool.</summary>
+        /// <summary>Sets damage band for that tier, adds a spell from the tier pool to owned (preferring unowned), and equips it.</summary>
         public void ApplyChestMagicReward(ChestMagicTier tier)
         {
             switch (tier)
             {
                 case ChestMagicTier.Basic:
                     SetSpellDamageRange(1, 2);
-                    TryEquipRandomFromPool(MagicSpellPools.Elemental);
+                    GrantSpellFromChestPool(MagicSpellPools.Elemental);
                     break;
                 case ChestMagicTier.Rare:
                     SetSpellDamageRange(3, 4);
-                    TryEquipRandomFromPool(MagicSpellPools.RareMagicBlackWhite);
+                    GrantSpellFromChestPool(MagicSpellPools.RareMagicBlackWhite);
                     break;
                 case ChestMagicTier.Ultra:
                     SetSpellDamageRange(5, 10);
-                    TryEquipRandomFromPool(MagicSpellPools.DarknessPurity);
+                    GrantSpellFromChestPool(MagicSpellPools.DarknessPurity);
                     break;
             }
+        }
+
+        private void EnsureOwnedLists()
+        {
+            if (ownedSpellIds == null)
+                ownedSpellIds = new List<string>();
         }
 
         private void TryEquipRandomElementalStarter()
         {
             if (spells == null || spells.Count == 0)
                 return;
+            EnsureOwnedLists();
             SetSpellDamageRange(1, 2);
-            if (!TryEquipRandomFromPool(MagicSpellPools.Elemental))
+
+            SeedOwnedFromEquippedLibraryIndexIfEmpty();
+
+            if (ownedSpellIds.Count > 0)
+            {
+                SyncEquippedLibraryIndex();
+                return;
+            }
+
+            var candidates = CollectLibraryIndicesMatchingPool(MagicSpellPools.Elemental);
+            if (candidates.Count == 0)
+            {
                 equippedIndex = UnityEngine.Random.Range(0, spells.Count);
+                string fallbackId = spells[equippedIndex].spellId;
+                if (!string.IsNullOrEmpty(fallbackId))
+                    ownedSpellIds.Add(fallbackId);
+                equippedOwnedSlot = 0;
+                return;
+            }
+
+            int chosenLib = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            ownedSpellIds.Add(spells[chosenLib].spellId);
+            equippedOwnedSlot = 0;
+            equippedIndex = chosenLib;
         }
 
-        private bool TryEquipRandomFromPool(IReadOnlyList<string> spellIds)
+        /// <summary>If owned is empty, seed one spell from the serialized equipped library index (upgrade path / inspector).</summary>
+        private void SeedOwnedFromEquippedLibraryIndexIfEmpty()
         {
-            if (spells == null || spells.Count == 0 || spellIds == null || spellIds.Count == 0)
+            if (ownedSpellIds.Count > 0)
+                return;
+            if (equippedIndex < 0 || equippedIndex >= spells.Count)
+                return;
+            MagicSpellEntry e = spells[equippedIndex];
+            if (e == null || string.IsNullOrEmpty(e.spellId))
+                return;
+            ownedSpellIds.Add(e.spellId);
+            equippedOwnedSlot = 0;
+        }
+
+        private void GrantSpellFromChestPool(IReadOnlyList<string> spellIds)
+        {
+            EnsureOwnedLists();
+            var candidates = CollectLibraryIndicesMatchingPool(spellIds);
+            if (candidates.Count == 0)
+                return;
+
+            var unownedLibs = new List<int>(candidates.Count);
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                int lib = candidates[i];
+                string id = spells[lib].spellId;
+                if (!OwnedContains(id))
+                    unownedLibs.Add(lib);
+            }
+
+            var pickFrom = unownedLibs.Count > 0 ? unownedLibs : candidates;
+            int chosenLib = pickFrom[UnityEngine.Random.Range(0, pickFrom.Count)];
+            string chosenId = spells[chosenLib].spellId;
+
+            if (!OwnedContains(chosenId))
+                ownedSpellIds.Add(chosenId);
+
+            equippedOwnedSlot = IndexOfOwnedSpell(chosenId);
+            SyncEquippedLibraryIndex();
+        }
+
+        private int IndexOfOwnedSpell(string spellId)
+        {
+            if (ownedSpellIds == null || string.IsNullOrEmpty(spellId))
+                return 0;
+            for (int i = 0; i < ownedSpellIds.Count; i++)
+            {
+                if (string.Equals(ownedSpellIds[i], spellId, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+            return 0;
+        }
+
+        private bool OwnedContains(string spellId)
+        {
+            if (ownedSpellIds == null || string.IsNullOrEmpty(spellId))
+                return false;
+            for (int i = 0; i < ownedSpellIds.Count; i++)
+            {
+                if (string.Equals(ownedSpellIds[i], spellId, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        private void SyncEquippedLibraryIndex()
+        {
+            EnsureOwnedLists();
+
+            for (int i = ownedSpellIds.Count - 1; i >= 0; i--)
+            {
+                if (string.IsNullOrEmpty(ownedSpellIds[i]) || !TryResolveLibraryIndex(ownedSpellIds[i], out _))
+                    ownedSpellIds.RemoveAt(i);
+            }
+
+            if (ownedSpellIds.Count == 0)
+            {
+                equippedIndex = Mathf.Clamp(equippedIndex, 0, Mathf.Max(0, spells.Count - 1));
+                return;
+            }
+
+            equippedOwnedSlot = Mathf.Clamp(equippedOwnedSlot, 0, ownedSpellIds.Count - 1);
+            string id = ownedSpellIds[equippedOwnedSlot];
+            if (TryResolveLibraryIndex(id, out int libIdx))
+                equippedIndex = libIdx;
+
+            MaybeAwardFullSpellCollectionBonus();
+        }
+
+        /// <summary>True when every non-null spell entry in the library is owned (by spell id).</summary>
+        private bool HasCollectedEverySpellInLibrary()
+        {
+            EnsureOwnedLists();
+            if (spells == null || spells.Count == 0 || ownedSpellIds.Count == 0)
                 return false;
 
-            var candidates = new List<int>(8);
+            int validSpellsInLibrary = 0;
             for (int i = 0; i < spells.Count; i++)
             {
                 MagicSpellEntry e = spells[i];
+                if (e == null || string.IsNullOrEmpty(e.spellId))
+                    continue;
+                validSpellsInLibrary++;
+                if (!OwnedContains(e.spellId))
+                    return false;
+            }
+
+            return validSpellsInLibrary > 0;
+        }
+
+        private void MaybeAwardFullSpellCollectionBonus()
+        {
+            if (!HasCollectedEverySpellInLibrary())
+                return;
+            GameRunScore.TryAwardFullSpellCollectionBonus();
+        }
+
+        private bool TryResolveLibraryIndex(string spellId, out int libraryIndex)
+        {
+            libraryIndex = -1;
+            if (string.IsNullOrEmpty(spellId) || spells == null)
+                return false;
+            for (int i = 0; i < spells.Count; i++)
+            {
+                MagicSpellEntry e = spells[i];
+                if (e != null && string.Equals(e.spellId, spellId, StringComparison.OrdinalIgnoreCase))
+                {
+                    libraryIndex = i;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static List<int> CollectLibraryIndicesMatchingPool(IReadOnlyList<string> spellIds, List<MagicSpellEntry> spellLib)
+        {
+            var candidates = new List<int>(8);
+            if (spellLib == null || spellLib.Count == 0 || spellIds == null || spellIds.Count == 0)
+                return candidates;
+
+            for (int i = 0; i < spellLib.Count; i++)
+            {
+                MagicSpellEntry e = spellLib[i];
                 if (e == null || string.IsNullOrEmpty(e.spellId))
                     continue;
                 for (int j = 0; j < spellIds.Count; j++)
@@ -206,10 +382,12 @@ namespace Dungeon.Magic
                 }
             }
 
-            if (candidates.Count == 0)
-                return false;
-            equippedIndex = candidates[UnityEngine.Random.Range(0, candidates.Count)];
-            return true;
+            return candidates;
+        }
+
+        private List<int> CollectLibraryIndicesMatchingPool(IReadOnlyList<string> spellIds)
+        {
+            return CollectLibraryIndicesMatchingPool(spellIds, spells);
         }
 
         /// <summary>Case-insensitive match on <see cref="MagicSpellEntry.spellId"/> (same ids as Art/Magic file names).</summary>
@@ -234,21 +412,33 @@ namespace Dungeon.Magic
 
         private void UpdateSpellHotkeys()
         {
-            if (spells.Count <= 1)
+            EnsureOwnedLists();
+            SyncEquippedLibraryIndex();
+            if (ownedSpellIds.Count <= 1)
                 return;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current == null)
                 return;
-            if (Keyboard.current.leftBracketKey.wasPressedThisFrame)
-                equippedIndex = (equippedIndex - 1 + spells.Count) % spells.Count;
-            else if (Keyboard.current.rightBracketKey.wasPressedThisFrame)
-                equippedIndex = (equippedIndex + 1) % spells.Count;
+            bool prev = Keyboard.current.leftBracketKey.wasPressedThisFrame;
+            bool next = Keyboard.current.rightBracketKey.wasPressedThisFrame
+                        || Keyboard.current.spaceKey.wasPressedThisFrame;
+            if (prev)
+            {
+                equippedOwnedSlot = (equippedOwnedSlot - 1 + ownedSpellIds.Count) % ownedSpellIds.Count;
+                SyncEquippedLibraryIndex();
+            }
+            else if (next)
+            {
+                equippedOwnedSlot = (equippedOwnedSlot + 1) % ownedSpellIds.Count;
+                SyncEquippedLibraryIndex();
+            }
 #endif
         }
 
         private void UpdateAimVisual()
         {
             EnsureAimVisual();
+            SyncEquippedLibraryIndex();
             MagicSpellEntry entry = spells.Count > 0 && equippedIndex >= 0 && equippedIndex < spells.Count
                 ? spells[equippedIndex]
                 : null;
@@ -318,6 +508,9 @@ namespace Dungeon.Magic
         private void OnValidate()
         {
             equippedIndex = Mathf.Max(0, equippedIndex);
+            EnsureOwnedLists();
+            if (ownedSpellIds.Count > 0)
+                equippedOwnedSlot = Mathf.Clamp(equippedOwnedSlot, 0, ownedSpellIds.Count - 1);
 
             if (!autoPopulateWhenEmptyInEditor || spells.Count > 0)
                 return;
@@ -374,6 +567,7 @@ namespace Dungeon.Magic
             spells.Sort((a, b) =>
                 string.Compare(a.spellId, b.spellId, StringComparison.OrdinalIgnoreCase));
             equippedIndex = Mathf.Clamp(equippedIndex, 0, Mathf.Max(0, spells.Count - 1));
+            SyncEquippedLibraryIndex();
 
             UnityEditor.EditorUtility.SetDirty(this);
         }

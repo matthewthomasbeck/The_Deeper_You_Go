@@ -1185,6 +1185,7 @@ GameObject:
   - component: {fileID: 999354575}
   - component: {fileID: 999354577}
   - component: {fileID: 999354576}
+  - component: {fileID: 999354578}
   m_Layer: 5
   m_Name: PlayPrompt
   m_TagString: Untagged
@@ -1311,6 +1312,23 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 999354574}
   m_CullTransparentMesh: 1
+--- !u!114 &999354578
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 999354574}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8c4a2e614d54321a9f87e6d05c1b3ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  scaleMin: 1
+  scaleMax: 1.1
+  periodSeconds: 0.8
+  phaseOffsetRadians: 0
+  useUnscaledTime: 1
 --- !u!1 &1111517286
 GameObject:
   m_ObjectHideFlags: 0
@@ -1487,6 +1505,7 @@ GameObject:
   - component: {fileID: 1412086198}
   - component: {fileID: 1412086200}
   - component: {fileID: 1412086199}
+  - component: {fileID: 1412086201}
   m_Layer: 5
   m_Name: FinalScore
   m_TagString: Untagged
@@ -1613,6 +1632,23 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1412086197}
   m_CullTransparentMesh: 1
+--- !u!114 &1412086201
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1412086197}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b8c4a2e614d54321a9f87e6d05c1b3ef, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  scaleMin: 1
+  scaleMax: 1.1
+  periodSeconds: 0.8833333
+  phaseOffsetRadians: 1.88495559
+  useUnscaledTime: 1
 --- !u!1 &1511158582
 GameObject:
   m_ObjectHideFlags: 0
