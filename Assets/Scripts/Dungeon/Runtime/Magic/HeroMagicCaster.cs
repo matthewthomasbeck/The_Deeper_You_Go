@@ -54,6 +54,8 @@ namespace Dungeon.Magic
         [SerializeField] private int spellDamageMin = 1;
         [SerializeField] private int spellDamageMax = 2;
 
+        public int OwnedSpellCount => ownedSpellIds != null ? ownedSpellIds.Count : 0;
+
         private Transform HeroTransform => transform;
 
         /// <summary>True when serialized spell entries exist (enemy VFX and hero casting need this).</summary>
@@ -187,6 +189,14 @@ namespace Dungeon.Magic
                     GrantSpellFromChestPool(MagicSpellPools.DarknessPurity);
                     break;
             }
+        }
+
+        /// <summary>Applies chest magic reward and returns true only if a new spell was added.</summary>
+        public bool TryApplyChestMagicReward(ChestMagicTier tier)
+        {
+            int before = OwnedSpellCount;
+            ApplyChestMagicReward(tier);
+            return OwnedSpellCount > before;
         }
 
         private void EnsureOwnedLists()

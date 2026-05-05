@@ -63,6 +63,16 @@ namespace Dungeon
         None,
     }
 
+    public enum ArmorMaterial
+    {
+        None = 0,
+        Leather = 1,
+        Bronze = 2,
+        Steel = 3,
+        Pure = 4,
+        Darkness = 5,
+    }
+
     [Serializable]
     public struct TilePos
     {

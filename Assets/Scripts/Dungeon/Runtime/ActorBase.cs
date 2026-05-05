@@ -16,6 +16,7 @@ namespace Dungeon
 
         [Header("Stats")]
         [SerializeField] private int maxHealth = 10;
+        [SerializeField] private int bonusMaxHealth = 0;
         [SerializeField] private int maxStamina = 5;
         [SerializeField] private int maxMagica = 3;
 
@@ -26,7 +27,7 @@ namespace Dungeon
             get => health;
             set => health = Mathf.Max(0, value);
         }
-        public int MaxHealth => maxHealth;
+        public int MaxHealth => maxHealth + bonusMaxHealth;
 
         public int Stamina
         {
@@ -113,6 +114,20 @@ namespace Dungeon
             newMaxHealth = Mathf.Max(1, newMaxHealth);
             maxHealth = newMaxHealth;
             Health = maxHealth;
+        }
+
+        /// <summary>Applies additional max health from equipment/buffs and optionally heals by the added amount.</summary>
+        public void SetBonusMaxHealth(int bonusAmount, bool healForIncrease = true)
+        {
+            int clampedBonus = Mathf.Max(0, bonusAmount);
+            int oldMax = MaxHealth;
+            bonusMaxHealth = clampedBonus;
+            int newMax = MaxHealth;
+
+            if (healForIncrease && newMax > oldMax)
+                Health += (newMax - oldMax);
+
+            Health = Mathf.Clamp(Health, 0, newMax);
         }
 
 

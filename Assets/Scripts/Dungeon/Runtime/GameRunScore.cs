@@ -60,5 +60,11 @@ namespace Dungeon
             EnemyKills++;
             TotalPoints += Mathf.Max(0, points);
         }
+
+        /// <summary>Adds non-kill bonus points (e.g. chest fallback rewards).</summary>
+        public static void AddBonusPoints(int points)
+        {
+            TotalPoints += Mathf.Max(0, points);
+        }
     }
 }

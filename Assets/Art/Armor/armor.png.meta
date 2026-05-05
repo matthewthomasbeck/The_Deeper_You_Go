@@ -691,7 +691,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: armor_steel_leggings-r2
+      name: steel_leggings-r2
       rect:
         serializedVersion: 2
         x: 32
@@ -1650,7 +1650,6 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      armor_steel_leggings-r2: -469502941
       bronze_chestplate-idle: 425375081
       bronze_chestplate-l1: -456202552
       bronze_chestplate-l2: -1149014039
@@ -1720,6 +1719,7 @@ TextureImporter:
       steel_leggings-l1: -1881368036
       steel_leggings-l2: 1313596470
       steel_leggings-r1: -816721360
+      steel_leggings-r2: -469502941
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

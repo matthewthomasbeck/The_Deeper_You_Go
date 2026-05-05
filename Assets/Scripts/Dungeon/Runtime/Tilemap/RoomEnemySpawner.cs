@@ -21,6 +21,16 @@ namespace Dungeon
 
         private static readonly List<Vector2Int> CandidateScratch = new List<Vector2Int>(256);
         private static readonly List<Sprite> IdlePoolScratch = new List<Sprite>(16);
+        private static readonly HashSet<Vector2Int> BlockedSpawnRoomCells = new HashSet<Vector2Int>();
+
+        public static void SetBlockedSpawnRoomCells(IEnumerable<Vector2Int> roomCells)
+        {
+            BlockedSpawnRoomCells.Clear();
+            if (roomCells == null)
+                return;
+            foreach (var c in roomCells)
+                BlockedSpawnRoomCells.Add(c);
+        }
 
         public static void ClearSpawned(Tilemap dungeonTilemap)
         {
@@ -53,6 +63,8 @@ namespace Dungeon
             if (baseTilemap == null || tileset == null || roomCells == null || roomCells.Count == 0)
                 return;
             if (idleSprites == null || !idleSprites.HasAnySprite())
+                return;
+            if (BlockedSpawnRoomCells.Count > 0 && RoomMatchesBlockedSpawnRoom(roomCells))
                 return;
 
             IdlePoolScratch.Clear();
@@ -190,6 +202,20 @@ namespace Dungeon
                 int j = Random.Range(0, i + 1);
                 (list[i], list[j]) = (list[j], list[i]);
             }
+        }
+
+        private static bool RoomMatchesBlockedSpawnRoom(HashSet<Vector2Int> roomCells)
+        {
+            if (roomCells == null || roomCells.Count == 0 || BlockedSpawnRoomCells.Count == 0)
+                return false;
+            if (roomCells.Count != BlockedSpawnRoomCells.Count)
+                return false;
+            foreach (var c in roomCells)
+            {
+                if (!BlockedSpawnRoomCells.Contains(c))
+                    return false;
+            }
+            return true;
         }
     }
 }

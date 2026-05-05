@@ -47,6 +47,11 @@ namespace Dungeon
         [Header("Held Item (prototype)")]
         public ItemDefinition heldItem; // important: later add hotbar slot selection
 
+        [Header("Armor (max health bonus)")]
+        public ArmorMaterial leggingsArmor = ArmorMaterial.None;
+        public ArmorMaterial chestplateArmor = ArmorMaterial.None;
+        public ArmorMaterial helmetArmor = ArmorMaterial.None;
+
         private ActorBase hero;
         private Rigidbody2D rb;
         private Vector2 moveInput;
@@ -56,6 +61,14 @@ namespace Dungeon
         private Sprite[][] torsoSets;
         private Dictionary<string, Sprite> spriteLookup;
         private HeroMagicCaster magicCaster;
+
+        private static readonly string[] ArmorAnimSuffixByFrame = { "idle", "r1", "r2", "l1", "l2" };
+        private enum RoomSizeBand
+        {
+            Small = 0,
+            Medium = 1,
+            Large = 2,
+        }
 
         private int EffectiveHeroSpriteIndex =>
             headSets == null || headSets.Length == 0 ? 0 : Mathf.Clamp(heroIndex, 0, headSets.Length - 1);
@@ -89,6 +102,7 @@ namespace Dungeon
             LoadHeroSpriteSets();
             ClampHeroIndex();
             ApplyCurrentHeroFrame(0);
+            ApplyArmorHealthBonus();
         }
 
         private void OnEnable()
@@ -118,6 +132,7 @@ namespace Dungeon
 
             ReadMoveInput();
             UpdateHeroAnimation();
+            ApplyArmorHealthBonus();
             TryPickupChestUnderHero();
             HandleMouseInput();
         }
@@ -366,6 +381,18 @@ namespace Dungeon
                 if (!lookup.ContainsKey(key))
                     lookup.Add(key, s);
             }
+
+            // Ensure armor variants are available for visual equip overrides.
+            const string armorSheetPath = "Assets/Art/Armor/armor.png";
+            var armorSubAssets = AssetDatabase.LoadAllAssetRepresentationsAtPath(armorSheetPath);
+            for (int i = 0; i < armorSubAssets.Length; i++)
+            {
+                if (armorSubAssets[i] is not Sprite s)
+                    continue;
+                string key = s.name.ToLowerInvariant();
+                if (!lookup.ContainsKey(key))
+                    lookup.Add(key, s);
+            }
 #endif
 
             var sprites = Resources.FindObjectsOfTypeAll<Sprite>();
@@ -452,9 +479,9 @@ namespace Dungeon
             if (headSets == null)
                 return;
             int hi = EffectiveHeroSpriteIndex;
-            SetRendererFrame(headRenderer, headSets[hi], frameIndex);
-            SetRendererFrame(legsRenderer, legsSets[hi], frameIndex);
-            SetRendererFrame(torsoRenderer, torsoSets[hi], frameIndex);
+            SetRendererFrameWithArmor(headRenderer, headSets[hi], frameIndex, ArmorSlot.Helmet, helmetArmor);
+            SetRendererFrameWithArmor(legsRenderer, legsSets[hi], frameIndex, ArmorSlot.Leggings, leggingsArmor);
+            SetRendererFrameWithArmor(torsoRenderer, torsoSets[hi], frameIndex, ArmorSlot.Chestplate, chestplateArmor);
         }
 
         private void SetRendererFrame(SpriteRenderer sr, Sprite[] frames, int frameIndex)
@@ -463,6 +490,25 @@ namespace Dungeon
                 return;
             if (frames[frameIndex] != null)
                 sr.sprite = frames[frameIndex];
+        }
+
+        private void SetRendererFrameWithArmor(
+            SpriteRenderer sr,
+            Sprite[] baseFrames,
+            int frameIndex,
+            ArmorSlot slot,
+            ArmorMaterial material)
+        {
+            if (sr == null)
+                return;
+
+            if (TryGetArmorSprite(slot, material, frameIndex, out Sprite armorSprite))
+            {
+                sr.sprite = armorSprite;
+                return;
+            }
+
+            SetRendererFrame(sr, baseFrames, frameIndex);
         }
 
         private void UpdateHeroOcclusionSorting()
@@ -540,8 +586,6 @@ namespace Dungeon
         {
             if (GamePauseState.IsPaused)
                 return;
-            if (magicCaster == null)
-                return;
             AutoResolveDungeonReferences();
             if (decorationTilemap == null || roomTileset == null)
                 return;
@@ -555,7 +599,55 @@ namespace Dungeon
 
             bool removedLightSource = roomTileset.IsLightSourceTile(t);
             decorationTilemap.SetTile(cell, null);
-            magicCaster.ApplyChestMagicReward(tier);
+
+            RoomSizeBand band = ResolveRoomSizeBandAtCell(cell);
+            bool isRerollChest = tier == ChestMagicTier.Rare || tier == ChestMagicTier.Ultra;
+            if (isRerollChest)
+            {
+                const int maxAttempts = 5;
+                bool granted = false;
+                for (int attempt = 0; attempt < maxAttempts; attempt++)
+                {
+                    bool chooseArmorReward = UnityEngine.Random.value < 0.5f;
+                    if (chooseArmorReward)
+                    {
+                        if (TryGrantChestArmorReward(band))
+                        {
+                            granted = true;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        if (magicCaster != null && magicCaster.TryApplyChestMagicReward(tier))
+                        {
+                            granted = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!granted)
+                {
+                    GameRunScore.AddBonusPoints(tier == ChestMagicTier.Ultra ? 20 : 10);
+                }
+            }
+            else
+            {
+                bool chooseArmorReward = UnityEngine.Random.value < 0.5f;
+                if (chooseArmorReward)
+                {
+                    if (!TryGrantChestArmorReward(band) && magicCaster != null)
+                        magicCaster.ApplyChestMagicReward(tier);
+                }
+                else
+                {
+                    if (magicCaster != null)
+                        magicCaster.ApplyChestMagicReward(tier);
+                    else
+                        TryGrantChestArmorReward(band, forceArmor: true);
+                }
+            }
 
             if (removedLightSource)
             {
@@ -579,6 +671,272 @@ namespace Dungeon
                 return;
 
             sr.sharedMaterial = new Material(lit);
+        }
+
+        private void ApplyArmorHealthBonus()
+        {
+            if (hero == null)
+                return;
+
+            int bonus = GetArmorPieceBonus(leggingsArmor)
+                        + GetArmorPieceBonus(chestplateArmor)
+                        + GetArmorPieceBonus(helmetArmor);
+            hero.SetBonusMaxHealth(bonus, healForIncrease: true);
+        }
+
+        private static int GetArmorPieceBonus(ArmorMaterial material)
+        {
+            switch (material)
+            {
+                case ArmorMaterial.Leather: return 1;
+                case ArmorMaterial.Bronze: return 2;
+                case ArmorMaterial.Steel: return 3;
+                case ArmorMaterial.Pure: return 4;
+                case ArmorMaterial.Darkness: return 5;
+                default: return 0;
+            }
+        }
+
+        private enum ArmorSlot
+        {
+            Leggings = 0,
+            Chestplate = 1,
+            Helmet = 2,
+        }
+
+        private bool TryGrantChestArmorReward(RoomSizeBand band, bool forceArmor = false)
+        {
+            ArmorMaterial material = RollChestArmorMaterial(band, forceArmor);
+            if (material == ArmorMaterial.None)
+                return false;
+
+            ArmorSlot slot = RollArmorSlotForMaterial(material);
+            bool upgraded = TryEquipArmorIfUpgrade(slot, material);
+            if (!upgraded)
+                return false;
+            ApplyArmorHealthBonus();
+            ApplyCurrentHeroFrame(ComputeAnimationFrameIndex());
+            return true;
+        }
+
+        private static ArmorMaterial RollChestArmorMaterial(RoomSizeBand band, bool forceArmor)
+        {
+            switch (band)
+            {
+                case RoomSizeBand.Small:
+                    // Small rooms: 25% chance to drop leather armor, otherwise spell.
+                    if (!forceArmor && UnityEngine.Random.value >= 0.25f)
+                        return ArmorMaterial.None;
+                    return ArmorMaterial.Leather;
+
+                case RoomSizeBand.Medium:
+                    // Medium: guaranteed armor, 25% steel, else 50% bronze, else leather.
+                    if (UnityEngine.Random.value < 0.25f)
+                        return ArmorMaterial.Steel;
+                    if (UnityEngine.Random.value < 0.50f)
+                        return ArmorMaterial.Bronze;
+                    return ArmorMaterial.Leather;
+
+                case RoomSizeBand.Large:
+                    // Large: guaranteed armor, 25% darkness, else 50% pure, else steel.
+                    if (UnityEngine.Random.value < 0.25f)
+                        return ArmorMaterial.Darkness;
+                    if (UnityEngine.Random.value < 0.50f)
+                        return ArmorMaterial.Pure;
+                    return ArmorMaterial.Steel;
+
+                default:
+                    return ArmorMaterial.None;
+            }
+        }
+
+        private bool TryEquipArmorIfUpgrade(ArmorSlot slot, ArmorMaterial incoming)
+        {
+            ArmorMaterial current = GetArmorInSlot(slot);
+            if ((int)incoming <= (int)current)
+                return false;
+
+            SetArmorInSlot(slot, incoming);
+            return true;
+        }
+
+        private ArmorMaterial GetArmorInSlot(ArmorSlot slot)
+        {
+            switch (slot)
+            {
+                case ArmorSlot.Leggings: return leggingsArmor;
+                case ArmorSlot.Chestplate: return chestplateArmor;
+                case ArmorSlot.Helmet: return helmetArmor;
+                default: return ArmorMaterial.None;
+            }
+        }
+
+        private void SetArmorInSlot(ArmorSlot slot, ArmorMaterial material)
+        {
+            switch (slot)
+            {
+                case ArmorSlot.Leggings:
+                    leggingsArmor = material;
+                    break;
+                case ArmorSlot.Chestplate:
+                    chestplateArmor = material;
+                    break;
+                case ArmorSlot.Helmet:
+                    helmetArmor = material;
+                    break;
+            }
+        }
+
+        private static ArmorSlot RollArmorSlotForMaterial(ArmorMaterial material)
+        {
+            if (material == ArmorMaterial.Leather)
+            {
+                // Leather has no helmet variant.
+                return UnityEngine.Random.value < 0.5f ? ArmorSlot.Leggings : ArmorSlot.Chestplate;
+            }
+
+            int roll = UnityEngine.Random.Range(0, 3);
+            return roll == 0 ? ArmorSlot.Leggings : (roll == 1 ? ArmorSlot.Chestplate : ArmorSlot.Helmet);
+        }
+
+        private RoomSizeBand ResolveRoomSizeBandAtCell(Vector3Int worldCell)
+        {
+            var boot = BspDungeonBootstrap.Instance;
+            if (boot == null || boot.LastGeneratedFloorGrid == null)
+                return RoomSizeBand.Medium;
+
+            RoomGrid grid = boot.LastGeneratedFloorGrid;
+            int gx = worldCell.x - boot.originCell.x;
+            int gy = worldCell.y - boot.originCell.y;
+            if (gx < 0 || gy < 0 || gx >= grid.width || gy >= grid.height)
+                return RoomSizeBand.Medium;
+
+            var components = CollectFloorWoodComponents(grid);
+            if (components.Count == 0)
+                return RoomSizeBand.Medium;
+
+            var areas = new List<int>(components.Count);
+            for (int i = 0; i < components.Count; i++)
+                areas.Add(components[i].Count);
+
+            var stats = RoomStructureDetailer.GetAverageRoomSize(areas);
+            float largeThreshold = stats.MeanArea + stats.StdDevArea;
+            float smallThreshold = stats.MeanArea - stats.StdDevArea;
+
+            int roomIndex = FindRoomComponentTouchingCellOrNeighbors(components, gx, gy);
+            if (roomIndex < 0 || roomIndex >= areas.Count)
+                return RoomSizeBand.Medium;
+
+            float area = areas[roomIndex];
+            if (area > largeThreshold)
+                return RoomSizeBand.Large;
+            if (area < smallThreshold)
+                return RoomSizeBand.Small;
+            return RoomSizeBand.Medium;
+        }
+
+        private static int FindRoomComponentTouchingCellOrNeighbors(List<HashSet<Vector2Int>> components, int x, int y)
+        {
+            var probes = new[]
+            {
+                new Vector2Int(x, y),
+                new Vector2Int(x - 1, y),
+                new Vector2Int(x + 1, y),
+                new Vector2Int(x, y - 1),
+                new Vector2Int(x, y + 1),
+                new Vector2Int(x - 1, y - 1),
+                new Vector2Int(x + 1, y - 1),
+                new Vector2Int(x - 1, y + 1),
+                new Vector2Int(x + 1, y + 1),
+            };
+
+            for (int i = 0; i < components.Count; i++)
+            {
+                HashSet<Vector2Int> c = components[i];
+                for (int p = 0; p < probes.Length; p++)
+                {
+                    if (c.Contains(probes[p]))
+                        return i;
+                }
+            }
+            return -1;
+        }
+
+        private bool TryGetArmorSprite(ArmorSlot slot, ArmorMaterial material, int frameIndex, out Sprite sprite)
+        {
+            sprite = null;
+            if (material == ArmorMaterial.None || spriteLookup == null)
+                return false;
+
+            int clampedFrame = Mathf.Clamp(frameIndex, 0, ArmorAnimSuffixByFrame.Length - 1);
+            string materialName = material.ToString().ToLowerInvariant();
+            string slotName = slot == ArmorSlot.Leggings
+                ? "leggings"
+                : (slot == ArmorSlot.Chestplate ? "chestplate" : "helmet");
+
+            string key = $"{materialName}_{slotName}-{ArmorAnimSuffixByFrame[clampedFrame]}";
+            spriteLookup.TryGetValue(key, out sprite);
+
+            if (sprite == null && clampedFrame != 0)
+                spriteLookup.TryGetValue($"{materialName}_{slotName}-idle", out sprite);
+
+            return sprite != null;
+        }
+
+        private static List<HashSet<Vector2Int>> CollectFloorWoodComponents(RoomGrid grid)
+        {
+            var result = new List<HashSet<Vector2Int>>();
+            bool[] visited = new bool[grid.width * grid.height];
+            var q = new Queue<Vector2Int>();
+
+            for (int y = 0; y < grid.height; y++)
+            {
+                for (int x = 0; x < grid.width; x++)
+                {
+                    int idx = x + y * grid.width;
+                    if (visited[idx] || grid.Get(x, y) != RoomTileKind.FloorWood)
+                        continue;
+
+                    var comp = new HashSet<Vector2Int>();
+                    visited[idx] = true;
+                    q.Enqueue(new Vector2Int(x, y));
+                    comp.Add(new Vector2Int(x, y));
+
+                    while (q.Count > 0)
+                    {
+                        Vector2Int p = q.Dequeue();
+                        TryQueueFloorNeighbor(grid, visited, q, comp, p.x - 1, p.y);
+                        TryQueueFloorNeighbor(grid, visited, q, comp, p.x + 1, p.y);
+                        TryQueueFloorNeighbor(grid, visited, q, comp, p.x, p.y - 1);
+                        TryQueueFloorNeighbor(grid, visited, q, comp, p.x, p.y + 1);
+                    }
+
+                    result.Add(comp);
+                }
+            }
+
+            return result;
+        }
+
+        private static void TryQueueFloorNeighbor(
+            RoomGrid grid,
+            bool[] visited,
+            Queue<Vector2Int> q,
+            HashSet<Vector2Int> component,
+            int x,
+            int y)
+        {
+            if (x < 0 || y < 0 || x >= grid.width || y >= grid.height)
+                return;
+
+            int idx = x + y * grid.width;
+            if (visited[idx] || grid.Get(x, y) != RoomTileKind.FloorWood)
+                return;
+
+            visited[idx] = true;
+            var p = new Vector2Int(x, y);
+            component.Add(p);
+            q.Enqueue(p);
         }
 
 

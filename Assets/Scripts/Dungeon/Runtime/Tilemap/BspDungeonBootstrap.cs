@@ -230,6 +230,7 @@ namespace Dungeon
                 decorationTilemap.ClearAllTiles();
 
             RoomEnemySpawner.ClearSpawned(tilemap);
+            RoomEnemySpawner.SetBlockedSpawnRoomCells(null);
 
             BspTilemapPainter.Paint(tilemap, originCell, tileset, floorGrid);
             BspTilemapPainter.CleanUpRooms(tilemap, originCell, tileset, floorGrid);
@@ -243,7 +244,16 @@ namespace Dungeon
                     this);
             }
 
+            Vector3Int chosenSpawnCell;
+            bool hasChosenSpawnCell = TryChoosePlayerSpawnCell(floorGrid, out chosenSpawnCell);
+            if (hasChosenSpawnCell)
+            {
+                Vector2Int spawnGrid = new Vector2Int(chosenSpawnCell.x - originCell.x, chosenSpawnCell.y - originCell.y);
+                RoomEnemySpawner.SetBlockedSpawnRoomCells(CollectConnectedFloorRoomCells(floorGrid, spawnGrid.x, spawnGrid.y));
+            }
+
             RoomStructureDetailer.DetailRoomStructure(tilemap, originCell, tileset, floorGrid, decorationTilemap, idles);
+            RoomEnemySpawner.SetBlockedSpawnRoomCells(null);
 
             if (buildRuntimeLighting)
             {
@@ -260,7 +270,7 @@ namespace Dungeon
                     runtimeLightColor);
             }
 
-            SpawnPlayerInRoom(floorGrid);
+            SpawnPlayerInRoom(floorGrid, hasChosenSpawnCell ? chosenSpawnCell : (Vector3Int?)null);
             CompanionDogBehaviour.SpawnOrRespawn(this, GameObject.Find(playerObjectName));
             FrameMainCameraOnDungeon(floorGrid.width, floorGrid.height);
 
@@ -392,7 +402,7 @@ namespace Dungeon
             decorationTilemap = decTm;
         }
 
-        private void SpawnPlayerInRoom(RoomGrid floorGrid)
+        private void SpawnPlayerInRoom(RoomGrid floorGrid, Vector3Int? preselectedCell = null)
         {
             if (!spawnPlayerInRoomOnGenerate || floorGrid == null || tilemap == null)
                 return;
@@ -400,6 +410,21 @@ namespace Dungeon
             var playerGo = GameObject.Find(playerObjectName);
             if (playerGo == null)
                 return;
+
+            Vector3Int chosen;
+            if (preselectedCell.HasValue)
+                chosen = preselectedCell.Value;
+            else if (!TryChoosePlayerSpawnCell(floorGrid, out chosen))
+                return;
+            Vector3 world = tilemap.GetCellCenterWorld(chosen);
+            playerGo.transform.position = new Vector3(world.x, world.y, playerGo.transform.position.z);
+        }
+
+        private bool TryChoosePlayerSpawnCell(RoomGrid floorGrid, out Vector3Int chosenCell)
+        {
+            chosenCell = default;
+            if (floorGrid == null)
+                return false;
 
             var interiorCandidates = new List<Vector3Int>();
             var roomCandidates = new List<Vector3Int>();
@@ -425,11 +450,55 @@ namespace Dungeon
 
             var candidates = interiorCandidates.Count > 0 ? interiorCandidates : roomCandidates;
             if (candidates.Count == 0)
+                return false;
+
+            chosenCell = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            return true;
+        }
+
+        private static HashSet<Vector2Int> CollectConnectedFloorRoomCells(RoomGrid floorGrid, int startX, int startY)
+        {
+            var result = new HashSet<Vector2Int>();
+            if (floorGrid == null)
+                return result;
+            if (startX < 0 || startY < 0 || startX >= floorGrid.width || startY >= floorGrid.height)
+                return result;
+            if (floorGrid.Get(startX, startY) != RoomTileKind.FloorWood)
+                return result;
+
+            var q = new Queue<Vector2Int>();
+            var start = new Vector2Int(startX, startY);
+            result.Add(start);
+            q.Enqueue(start);
+
+            while (q.Count > 0)
+            {
+                Vector2Int p = q.Dequeue();
+                TryPushFloorNeighbor(floorGrid, result, q, p.x - 1, p.y);
+                TryPushFloorNeighbor(floorGrid, result, q, p.x + 1, p.y);
+                TryPushFloorNeighbor(floorGrid, result, q, p.x, p.y - 1);
+                TryPushFloorNeighbor(floorGrid, result, q, p.x, p.y + 1);
+            }
+
+            return result;
+        }
+
+        private static void TryPushFloorNeighbor(
+            RoomGrid floorGrid,
+            HashSet<Vector2Int> visited,
+            Queue<Vector2Int> q,
+            int x,
+            int y)
+        {
+            if (x < 0 || y < 0 || x >= floorGrid.width || y >= floorGrid.height)
+                return;
+            if (floorGrid.Get(x, y) != RoomTileKind.FloorWood)
                 return;
 
-            var chosen = candidates[UnityEngine.Random.Range(0, candidates.Count)];
-            Vector3 world = tilemap.GetCellCenterWorld(chosen);
-            playerGo.transform.position = new Vector3(world.x, world.y, playerGo.transform.position.z);
+            var p = new Vector2Int(x, y);
+            if (!visited.Add(p))
+                return;
+            q.Enqueue(p);
         }
 
         /// <summary>Call after changing decoration tiles at runtime (e.g. chest pickup).</summary>
