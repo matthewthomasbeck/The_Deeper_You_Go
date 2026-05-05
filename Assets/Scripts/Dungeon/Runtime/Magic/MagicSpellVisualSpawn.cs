@@ -16,7 +16,12 @@ namespace Dungeon.Magic
             int aimSortingOrder,
             bool enemyCasterMagic = false,
             int enemyMagicDamage = 1,
-            int enemyCasterBurstDedupeGroupId = 0)
+            int enemyCasterBurstDedupeGroupId = 0,
+            int heroMagicDamage = 1,
+            float heroProjectileSpeed = 0f,
+            int heroProjectileBounceCount = 0,
+            MagicSpellCategory heroSpellCategory = MagicSpellCategory.Fast,
+            MagicSpellEffectType heroSpellEffectType = MagicSpellEffectType.Base)
         {
             if (entry == null)
                 return;
@@ -44,6 +49,9 @@ namespace Dungeon.Magic
                         MagicVisualPresentation.RayWidthMultiplier,
                         enemyCasterMagic,
                         enemyMagicDamage,
+                        heroMagicDamage,
+                        heroSpellCategory,
+                        heroSpellEffectType,
                         enemyCasterBurstDedupeGroupId);
                     break;
                 }
@@ -61,40 +69,46 @@ namespace Dungeon.Magic
 
                 case MagicSpellKind.ProjectileOrb:
                 {
-                    float spd = VampireEnemyBalance.ThrallMoveSpeedWorldUnits;
-                    if (enemyCasterMagic)
-                        spd *= VampireEnemyBalance.EnemyCasterProjectileSpeedScale;
+                    int hitDamage = enemyCasterMagic ? enemyMagicDamage : heroMagicDamage;
+                    float spd = enemyCasterMagic
+                        ? VampireEnemyBalance.ThrallMoveSpeedWorldUnits * VampireEnemyBalance.EnemyCasterProjectileSpeedScale
+                        : Mathf.Max(0.01f, heroProjectileSpeed);
                     SpawnProjectile(
                         entry,
                         originWorld,
                         dir,
                         spd,
-                        true,
+                        enemyCasterMagic ? 1 : Mathf.Max(0, heroProjectileBounceCount),
                         spawnOffsetAlongAim,
                         aimSortingOrder,
                         enemyCasterMagic,
-                        enemyMagicDamage,
-                        enemyCasterBurstDedupeGroupId);
+                        hitDamage,
+                        enemyCasterBurstDedupeGroupId,
+                        heroSpellCategory,
+                        heroSpellEffectType);
                     break;
                 }
 
                 case MagicSpellKind.ProjectileFast:
                 default:
                 {
-                    float spd = VampireEnemyBalance.ThrallMoveSpeedWorldUnits * 2f;
-                    if (enemyCasterMagic)
-                        spd *= VampireEnemyBalance.EnemyCasterProjectileSpeedScale;
+                    int hitDamage = enemyCasterMagic ? enemyMagicDamage : heroMagicDamage;
+                    float spd = enemyCasterMagic
+                        ? (VampireEnemyBalance.ThrallMoveSpeedWorldUnits * 2f) * VampireEnemyBalance.EnemyCasterProjectileSpeedScale
+                        : Mathf.Max(0.01f, heroProjectileSpeed);
                     SpawnProjectile(
                         entry,
                         originWorld,
                         dir,
                         spd,
-                        false,
+                        enemyCasterMagic ? 0 : Mathf.Max(0, heroProjectileBounceCount),
                         spawnOffsetAlongAim,
                         aimSortingOrder,
                         enemyCasterMagic,
-                        enemyMagicDamage,
-                        enemyCasterBurstDedupeGroupId);
+                        hitDamage,
+                        enemyCasterBurstDedupeGroupId,
+                        heroSpellCategory,
+                        heroSpellEffectType);
                     break;
                 }
             }
@@ -105,12 +119,14 @@ namespace Dungeon.Magic
             Vector2 originWorld,
             Vector2 dirNorm,
             float speed,
-            bool bounceOnce,
+            int maxBounces,
             float spawnOffsetAlongAim,
             int aimSortingOrder,
             bool enemyCasterMagic,
             int enemyMagicDamage,
-            int enemyCasterBurstDedupeGroupId)
+            int enemyCasterBurstDedupeGroupId,
+            MagicSpellCategory heroSpellCategory,
+            MagicSpellEffectType heroSpellEffectType)
         {
             Vector2 spawn = originWorld + dirNorm * spawnOffsetAlongAim;
             var go = new GameObject($"MagicProjectile_{entry.spellId}");
@@ -119,12 +135,14 @@ namespace Dungeon.Magic
                 spawn,
                 dirNorm,
                 speed,
-                bounceOnce,
+                maxBounces,
                 entry.frames,
                 aimSortingOrder + 10,
                 enemyCasterMagic,
                 enemyMagicDamage,
-                enemyCasterBurstDedupeGroupId);
+                enemyCasterBurstDedupeGroupId,
+                heroSpellCategory,
+                heroSpellEffectType);
         }
     }
 }

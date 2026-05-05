@@ -13,7 +13,6 @@ namespace Dungeon.Magic
         [SerializeField] private float collisionRadius = 0.12f;
 
         private float speed;
-        private bool allowOneBounce;
         private int remainingBounces;
         private Vector2 velocity;
         private Sprite[] frames;
@@ -24,26 +23,31 @@ namespace Dungeon.Magic
         private bool fromEnemyCaster;
         private int enemyHitDamage = 1;
         private int enemyBurstDedupeGroupId;
+        private MagicSpellCategory heroSpellCategory = MagicSpellCategory.Fast;
+        private MagicSpellEffectType heroSpellEffectType = MagicSpellEffectType.Base;
 
         public void Launch(
             Vector2 startPosition,
             Vector2 direction,
             float moveSpeed,
-            bool bounceOnce,
+            int maxBounces,
             Sprite[] animationFrames,
             int sortingOrder,
             bool enemyCasterProjectile = false,
             int enemyProjectileDamage = 1,
-            int enemyCasterBurstDedupeGroupId = 0)
+            int enemyCasterBurstDedupeGroupId = 0,
+            MagicSpellCategory heroProjectileCategory = MagicSpellCategory.Fast,
+            MagicSpellEffectType heroProjectileEffectType = MagicSpellEffectType.Base)
         {
             transform.position = new Vector3(startPosition.x, startPosition.y, transform.position.z);
             speed = moveSpeed;
-            allowOneBounce = bounceOnce;
-            remainingBounces = bounceOnce ? 1 : 0;
+            remainingBounces = Mathf.Max(0, maxBounces);
             frames = animationFrames;
             fromEnemyCaster = enemyCasterProjectile;
             enemyHitDamage = Mathf.Max(1, enemyProjectileDamage);
             enemyBurstDedupeGroupId = enemyCasterBurstDedupeGroupId;
+            heroSpellCategory = heroProjectileCategory;
+            heroSpellEffectType = heroProjectileEffectType;
             velocity = direction.sqrMagnitude > 0.0001f ? direction.normalized * moveSpeed : Vector2.right * moveSpeed;
 
             if (spriteRenderer == null)
@@ -131,7 +135,12 @@ namespace Dungeon.Magic
                 if (fromEnemyCaster)
                     MagicHitDamage.ApplyEnemyCasterHit(bestEnemy, enemyHitDamage, enemyBurstDedupeGroupId);
                 else
-                    MagicHitDamage.ApplyOneToNpc(bestEnemy);
+                    MagicHitDamage.ApplyHeroMagicHit(
+                        bestEnemy,
+                        enemyHitDamage,
+                        heroSpellCategory,
+                        heroSpellEffectType,
+                        velocity.normalized);
                 Destroy(gameObject);
                 return false;
             }
@@ -142,7 +151,7 @@ namespace Dungeon.Magic
                 return true;
             }
 
-            if (allowOneBounce && remainingBounces > 0)
+            if (remainingBounces > 0)
             {
                 remainingBounces--;
                 pos = (Vector2)wallHit.point + wallHit.normal * 0.03f;

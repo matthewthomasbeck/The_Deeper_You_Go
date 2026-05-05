@@ -30,7 +30,7 @@ namespace Dungeon
         [SerializeField]
         private VideoClip[] gameplayMusicClips;
 
-        [Tooltip("Plays from the start whenever you pause (assign pause_screen.mp4). Loops while time is frozen.")]
+        [Tooltip("Plays from the start whenever the game pauses (assign pause_screen.mp4). Loops while time is frozen.")]
         [SerializeField]
         private VideoClip pauseMusicClip;
 

@@ -50,9 +50,9 @@ namespace Dungeon.Magic
         [Tooltip("Editor / editor play mode: fills spell list from Assets/Art/Magic when empty.")]
         [SerializeField] private bool autoPopulateWhenEmptyInEditor = true;
 
-        [Header("Spell damage (per hit roll)")]
-        [SerializeField] private int spellDamageMin = 1;
-        [SerializeField] private int spellDamageMax = 2;
+        private float nextAllowedCastTime;
+        private MagicSpellCategory activeSpellCategory = MagicSpellCategory.Rays;
+        private readonly int[] categoryCycleIndices = new int[4];
 
         public int OwnedSpellCount => ownedSpellIds != null ? ownedSpellIds.Count : 0;
 
@@ -124,6 +124,7 @@ namespace Dungeon.Magic
             if (Application.isPlaying)
                 TryEquipRandomElementalStarter();
             SyncEquippedLibraryIndex();
+            SyncActiveCategoryFromEquippedSpell();
         }
 
         private void Update()
@@ -145,6 +146,14 @@ namespace Dungeon.Magic
                 return false;
 
             MagicSpellEntry entry = spells[equippedIndex];
+            MagicSpellProfile profile = MagicSpellTuning.Resolve(entry.spellId, entry.kind);
+            bool enforceCooldown = entry.kind != MagicSpellKind.RayBurst;
+            if (enforceCooldown)
+            {
+                if (Time.time < nextAllowedCastTime)
+                    return false;
+                nextAllowedCastTime = Time.time + (1f / Mathf.Max(0.01f, profile.CastsPerSecond));
+            }
             Vector2 origin = HeroTransform.position;
 
             MagicSpellVisualSpawn.Spawn(
@@ -154,21 +163,31 @@ namespace Dungeon.Magic
                 HeroTransform,
                 spawnOffsetAlongAim,
                 rayMaxLengthTiles,
-                aimSortingOrder);
+                aimSortingOrder,
+                enemyCasterMagic: false,
+                enemyMagicDamage: 1,
+                enemyCasterBurstDedupeGroupId: 0,
+                heroMagicDamage: profile.DamagePerHit,
+                heroProjectileSpeed: profile.ProjectileSpeedUnitsPerSecond,
+                heroProjectileBounceCount: profile.ProjectileBounces,
+                heroSpellCategory: profile.Category,
+                heroSpellEffectType: profile.EffectType);
             return true;
         }
 
         public int RollSpellDamage()
         {
-            int lo = Mathf.Min(spellDamageMin, spellDamageMax);
-            int hi = Mathf.Max(spellDamageMin, spellDamageMax);
-            return UnityEngine.Random.Range(lo, hi + 1);
+            SyncEquippedLibraryIndex();
+            if (spells == null || spells.Count == 0 || equippedIndex < 0 || equippedIndex >= spells.Count)
+                return 1;
+            MagicSpellEntry entry = spells[equippedIndex];
+            return MagicSpellTuning.Resolve(entry.spellId, entry.kind).DamagePerHit;
         }
 
         public void SetSpellDamageRange(int minInclusive, int maxInclusive)
         {
-            spellDamageMin = Mathf.Max(1, minInclusive);
-            spellDamageMax = Mathf.Max(spellDamageMin, maxInclusive);
+            // Intentionally kept for compatibility with existing calls.
+            // Damage now comes from per-spell tuning in MagicSpellTuning.
         }
 
         /// <summary>Sets damage band for that tier, adds a spell from the tier pool to owned (preferring unowned), and equips it.</summary>
@@ -177,16 +196,13 @@ namespace Dungeon.Magic
             switch (tier)
             {
                 case ChestMagicTier.Basic:
-                    SetSpellDamageRange(1, 2);
-                    GrantSpellFromChestPool(MagicSpellPools.Elemental);
+                    GrantSpellFromChestPool(MagicSpellPools.Regular);
                     break;
                 case ChestMagicTier.Rare:
-                    SetSpellDamageRange(3, 4);
-                    GrantSpellFromChestPool(MagicSpellPools.RareMagicBlackWhite);
+                    GrantSpellFromChestPool(MagicSpellPools.RareMagic);
                     break;
                 case ChestMagicTier.Ultra:
-                    SetSpellDamageRange(5, 10);
-                    GrantSpellFromChestPool(MagicSpellPools.DarknessPurity);
+                    GrantSpellFromChestPool(MagicSpellPools.UltraMagic);
                     break;
             }
         }
@@ -210,8 +226,6 @@ namespace Dungeon.Magic
             if (spells == null || spells.Count == 0)
                 return;
             EnsureOwnedLists();
-            SetSpellDamageRange(1, 2);
-
             SeedOwnedFromEquippedLibraryIndexIfEmpty();
 
             if (ownedSpellIds.Count > 0)
@@ -220,7 +234,7 @@ namespace Dungeon.Magic
                 return;
             }
 
-            var candidates = CollectLibraryIndicesMatchingPool(MagicSpellPools.Elemental);
+            var candidates = CollectLibraryIndicesMatchingPool(MagicSpellPools.Regular);
             if (candidates.Count == 0)
             {
                 equippedIndex = UnityEngine.Random.Range(0, spells.Count);
@@ -424,25 +438,97 @@ namespace Dungeon.Magic
         {
             EnsureOwnedLists();
             SyncEquippedLibraryIndex();
-            if (ownedSpellIds.Count <= 1)
-                return;
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current == null)
                 return;
-            bool prev = Keyboard.current.leftBracketKey.wasPressedThisFrame;
-            bool next = Keyboard.current.rightBracketKey.wasPressedThisFrame
-                        || Keyboard.current.spaceKey.wasPressedThisFrame;
-            if (prev)
-            {
-                equippedOwnedSlot = (equippedOwnedSlot - 1 + ownedSpellIds.Count) % ownedSpellIds.Count;
-                SyncEquippedLibraryIndex();
-            }
-            else if (next)
-            {
-                equippedOwnedSlot = (equippedOwnedSlot + 1) % ownedSpellIds.Count;
-                SyncEquippedLibraryIndex();
-            }
+
+            if (Keyboard.current.digit1Key.wasPressedThisFrame)
+                TrySelectSpellCategory(MagicSpellCategory.Rays);
+            else if (Keyboard.current.digit2Key.wasPressedThisFrame)
+                TrySelectSpellCategory(MagicSpellCategory.Fast);
+            else if (Keyboard.current.digit3Key.wasPressedThisFrame)
+                TrySelectSpellCategory(MagicSpellCategory.Orb);
+            else if (Keyboard.current.digit4Key.wasPressedThisFrame)
+                TrySelectSpellCategory(MagicSpellCategory.Slow);
+
+            if (Keyboard.current.spaceKey.wasPressedThisFrame)
+                CycleSpellWithinActiveCategory();
 #endif
+        }
+
+        private void SyncActiveCategoryFromEquippedSpell()
+        {
+            if (spells == null || spells.Count == 0 || equippedIndex < 0 || equippedIndex >= spells.Count)
+                return;
+            MagicSpellEntry entry = spells[equippedIndex];
+            activeSpellCategory = MagicSpellTuning.Resolve(entry.spellId, entry.kind).Category;
+        }
+
+        private bool TrySelectSpellCategory(MagicSpellCategory category)
+        {
+            activeSpellCategory = category;
+            var libs = CollectOwnedLibraryIndicesForCategory(category);
+            if (libs.Count == 0)
+                return false;
+
+            int categoryIdx = (int)category;
+            int currentPosition = libs.IndexOf(equippedIndex);
+            if (currentPosition >= 0)
+            {
+                categoryCycleIndices[categoryIdx] = currentPosition;
+                return true;
+            }
+
+            categoryCycleIndices[categoryIdx] = Mathf.Clamp(categoryCycleIndices[categoryIdx], 0, libs.Count - 1);
+            EquipLibraryIndex(libs[categoryCycleIndices[categoryIdx]]);
+            return true;
+        }
+
+        private bool CycleSpellWithinActiveCategory()
+        {
+            var libs = CollectOwnedLibraryIndicesForCategory(activeSpellCategory);
+            if (libs.Count == 0)
+                return false;
+
+            int categoryIdx = (int)activeSpellCategory;
+            int currentPosition = libs.IndexOf(equippedIndex);
+            if (currentPosition >= 0)
+                categoryCycleIndices[categoryIdx] = currentPosition;
+
+            categoryCycleIndices[categoryIdx] = (categoryCycleIndices[categoryIdx] + 1) % libs.Count;
+            EquipLibraryIndex(libs[categoryCycleIndices[categoryIdx]]);
+            return true;
+        }
+
+        private List<int> CollectOwnedLibraryIndicesForCategory(MagicSpellCategory category)
+        {
+            var result = new List<int>(ownedSpellIds.Count);
+            if (ownedSpellIds == null || spells == null || spells.Count == 0)
+                return result;
+
+            for (int i = 0; i < ownedSpellIds.Count; i++)
+            {
+                string id = ownedSpellIds[i];
+                if (!TryResolveLibraryIndex(id, out int libIdx))
+                    continue;
+                MagicSpellEntry entry = spells[libIdx];
+                MagicSpellCategory spellCategory = MagicSpellTuning.Resolve(entry.spellId, entry.kind).Category;
+                if (spellCategory == category)
+                    result.Add(libIdx);
+            }
+
+            return result;
+        }
+
+        private void EquipLibraryIndex(int libraryIndex)
+        {
+            if (spells == null || libraryIndex < 0 || libraryIndex >= spells.Count)
+                return;
+            equippedIndex = libraryIndex;
+            string id = spells[libraryIndex].spellId;
+            equippedOwnedSlot = Mathf.Clamp(IndexOfOwnedSpell(id), 0, Mathf.Max(0, ownedSpellIds.Count - 1));
+            nextAllowedCastTime = 0f;
+            SyncActiveCategoryFromEquippedSpell();
         }
 
         private void UpdateAimVisual()

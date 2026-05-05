@@ -53,6 +53,8 @@ namespace Dungeon
 
         protected BspDungeonBootstrap dungeon;
         protected Transform heroTransform;
+        private float magicMoveSpeedMultiplier = 1f;
+        private float magicSlowRemainingSeconds;
 
         protected int defaultEnemySpriteSortingOrder = 100;
 
@@ -205,6 +207,7 @@ namespace Dungeon
                 return;
 
             float dt = Time.deltaTime;
+            TickMagicMoveSpeedEffects(dt);
 
             if (ProcessAttackAnimationTick(dt))
                 return;
@@ -358,7 +361,7 @@ namespace Dungeon
             transform.position = Vector3.MoveTowards(
                 transform.position,
                 new Vector3(selfCellCenter.x, selfCellCenter.y, transform.position.z),
-                moveSpeedWorldUnits * dt);
+                GetCurrentMoveSpeedWorldUnits() * dt);
             return false;
         }
 
@@ -391,9 +394,32 @@ namespace Dungeon
         /// </summary>
         protected virtual void PerformChaseMovement(float dt, Vector3 nextFlat)
         {
-            transform.position = Vector3.MoveTowards(transform.position, nextFlat, moveSpeedWorldUnits * dt);
+            transform.position = Vector3.MoveTowards(transform.position, nextFlat, GetCurrentMoveSpeedWorldUnits() * dt);
             UpdateMoveSprite(dt);
             UpdateFacing(nextFlat.x - transform.position.x);
+        }
+
+        protected float GetCurrentMoveSpeedWorldUnits()
+        {
+            return moveSpeedWorldUnits * Mathf.Clamp(magicMoveSpeedMultiplier, 0.1f, 1f);
+        }
+
+        private void TickMagicMoveSpeedEffects(float dt)
+        {
+            if (magicSlowRemainingSeconds <= 0f)
+                return;
+            magicSlowRemainingSeconds -= dt;
+            if (magicSlowRemainingSeconds <= 0f)
+            {
+                magicSlowRemainingSeconds = 0f;
+                magicMoveSpeedMultiplier = 1f;
+            }
+        }
+
+        public void ApplyMagicSlow(float speedMultiplier, float durationSeconds)
+        {
+            magicMoveSpeedMultiplier = Mathf.Clamp(speedMultiplier, 0.1f, 1f);
+            magicSlowRemainingSeconds = Mathf.Max(magicSlowRemainingSeconds, Mathf.Max(0.01f, durationSeconds));
         }
 
         protected void ResetChaseRepathSoon()

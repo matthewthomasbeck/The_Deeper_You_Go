@@ -5,7 +5,7 @@ namespace Dungeon.Magic
     /// <summary>Spell ids match <c>Assets/Art/Magic</c> file names (without extension).</summary>
     public static class MagicSpellPools
     {
-        public static readonly IReadOnlyList<string> Elemental = new[]
+        public static readonly IReadOnlyList<string> Regular = new[]
         {
             "Ice Lance",
             "Splash",
@@ -19,7 +19,7 @@ namespace Dungeon.Magic
             "Plant Missle",
         };
 
-        public static readonly IReadOnlyList<string> RareMagicBlackWhite = new[]
+        public static readonly IReadOnlyList<string> RareMagic = new[]
         {
             "Magic Sparks",
             "Magic Orb",
@@ -29,7 +29,7 @@ namespace Dungeon.Magic
             "Light Bolt",
         };
 
-        public static readonly IReadOnlyList<string> DarknessPurity = new[]
+        public static readonly IReadOnlyList<string> UltraMagic = new[]
         {
             "Darkness Orb",
             "Darkness Bolt",

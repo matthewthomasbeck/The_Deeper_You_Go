@@ -53,7 +53,7 @@ namespace Dungeon
         [Tooltip("If true, runs Generate() from Start().")]
         public bool generateOnPlay = true;
 
-        [Tooltip("Log each step to the Console (disable after you confirm it works).")]
+        [Tooltip("Log each step to the Console (disable once behavior is verified).")]
         public bool verboseLogs = true;
 
         private bool pendingDecorationLightingRefresh;
@@ -70,7 +70,7 @@ namespace Dungeon
         public DungeonEnemyIdleSprites enemyIdleSprites = new DungeonEnemyIdleSprites();
 
         [Header("Thrall chase / attack sprites")]
-        [Tooltip("Shown here so you can assign without digging into the nested enemy list. Copied into spawn config when the dungeon generates.")]
+        [Tooltip("Exposed here for assignment without opening the nested enemy list. Copied into spawn config when the dungeon generates.")]
         public Sprite thrallMoveFrame1;
         public Sprite thrallMoveFrame2;
         public Sprite thrallAttackFrame;
@@ -111,7 +111,7 @@ namespace Dungeon
         public string playerObjectName = "Player";
 
         [Header("Companion dog")]
-        [Tooltip("Spawn the dog-idle tileset companion after the player; it follows and bites enemies near you.")]
+        [Tooltip("Spawn the dog-idle tileset companion after the player; it follows and bites enemies near the player.")]
         public bool spawnDogCompanion = true;
 
 #if UNITY_EDITOR

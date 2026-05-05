@@ -11,7 +11,7 @@ namespace Dungeon
         {
             this.instance = instance;
             this.tilePosition = tilePosition;
-            // For a visual prototype, you could map TilePos -> world position here.
+            // Visual prototype: TilePos -> world position mapping can go here.
         }
     }
 }

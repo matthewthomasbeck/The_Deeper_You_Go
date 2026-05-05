@@ -24,6 +24,9 @@ namespace Dungeon.Magic
             float widthScale = 1f,
             bool enemyCasterBeam = false,
             int enemyBeamDamage = 1,
+            int heroBeamDamage = 1,
+            MagicSpellCategory heroBeamCategory = MagicSpellCategory.Rays,
+            MagicSpellEffectType heroBeamEffectType = MagicSpellEffectType.Base,
             int enemyCasterBurstDedupeGroupId = 0)
         {
             age = 0f;
@@ -48,6 +51,9 @@ namespace Dungeon.Magic
                 Mathf.Max(0.02f, hitRadius),
                 enemyCasterBeam,
                 Mathf.Max(1, enemyBeamDamage),
+                Mathf.Max(1, heroBeamDamage),
+                heroBeamCategory,
+                heroBeamEffectType,
                 enemyCasterBurstDedupeGroupId);
         }
 
@@ -57,6 +63,9 @@ namespace Dungeon.Magic
             float radius,
             bool enemyCaster,
             int enemyDamage,
+            int heroDamage,
+            MagicSpellCategory heroCategory,
+            MagicSpellEffectType heroEffectType,
             int burstDedupeGroupId)
         {
             Vector2 ab = endWorld - startWorld;
@@ -88,7 +97,7 @@ namespace Dungeon.Magic
                     if (enemyCaster)
                         MagicHitDamage.ApplyEnemyCasterHit(actor, enemyDamage, burstDedupeGroupId);
                     else
-                        MagicHitDamage.ApplyOneToNpc(actor);
+                        MagicHitDamage.ApplyHeroMagicHit(actor, heroDamage, heroCategory, heroEffectType, ab.normalized);
                 }
             }
         }
