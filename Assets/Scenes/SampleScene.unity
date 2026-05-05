@@ -1032,6 +1032,8 @@ MonoBehaviour:
     - {fileID: -3810955277941533314, guid: c45d15ecefc0c402d8dd578d0794e305, type: 3}
     - {fileID: -8745454845570913566, guid: c45d15ecefc0c402d8dd578d0794e305, type: 3}
   equippedIndex: 0
+  ownedSpellIds: []
+  equippedOwnedSlot: 0
   autoPopulateWhenEmptyInEditor: 1
   spellDamageMin: 1
   spellDamageMax: 2
@@ -1647,7 +1649,7 @@ MonoBehaviour:
   scaleMin: 1
   scaleMax: 1.1
   periodSeconds: 0.8833333
-  phaseOffsetRadians: 1.88495559
+  phaseOffsetRadians: 1.8849556
   useUnscaledTime: 1
 --- !u!1 &1511158582
 GameObject:
@@ -2269,6 +2271,7 @@ MonoBehaviour:
   witchAttackFrame: {fileID: 1885959703, guid: 5b758bb0d5a2c4c2d92231f0361642ad, type: 3}
   spawnPlayerInRoomOnGenerate: 1
   playerObjectName: Player
+  spawnDogCompanion: 1
 --- !u!114 &3000000020
 MonoBehaviour:
   m_ObjectHideFlags: 0
